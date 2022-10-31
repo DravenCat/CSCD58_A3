@@ -1,2 +1,4 @@
 
-router/.idea/workspace.xml
+router/.idea
+router/cmake-build-debug
+router/CMakeLists.txt
