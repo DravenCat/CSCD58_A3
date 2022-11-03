@@ -175,6 +175,33 @@ void sr_handle_arp_packet(struct sr_instance *sr,
                           uint8_t *packet/* lent */,
                           unsigned int len,
                           char *interface/* lent */) {
+    sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)packet;
+    struct sr_if *source_if = sr_get_interface(sr,interface);
+    sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(packet+sizeof(sr_ethernet_hdr_t));
+    struct sr_if *target_if = get_interface_through_ip(sr,arp_hdr->ar_tip);
+    if(target_if && ntohs(arp_hdr->ar_op) == arp_op_request){
+        unsigned long length = sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t);
+        uint8_t *arp_reply = (unit8_t *)malloc(length);
+        
+
+        sr_ethernet_hdr_t *arp_reply_eth = (sr_ethernet_hdr_t *)arp_reply;
+        build_ether_header(arp_reply_eth, eth_hdr->ether_shost, source_if->addr, ethertype_arp);
+        sr_arp_hdr_t *arp_reply_hdr = (sr_arp_hdr_t *)(arp_reply + sizeof(sr_ethernet_hdr_t));
+        build_arp_header(arp_reply_hdr, source_if, arp_hdr, arp_op_reply);
+
+        sr_send_packet(sr,arp_reply,length,source_if->name);
+    }else if(target_if && ntohs(arp_hdr->ar_op) == arp_op_reply){
+        struct sr_arpreq *arp_req = sr_arpcache_insert(&(sr->cache), arp_hdr->ar_sha, ntohl(arp_hdr->ar_sip));
+        if(arp_req){
+            struct sr_packact* packet_pointer;
+            for(packet_pointer=arp_req->packets;packet_pointer!=NULL;packet_pointer=packet_pointer->next){
+                sr_ethernet_hdr_t *arp_req_eth = (sr_ethernet_hdr_t *)packet_pointer->buf;
+                build_ether_header(arp_req_eth, arp_hdr->ar_sha, source_if->addr, ethertype(packet_pointer->buf) );
+                sr_send_packet(sr,packet_pointer->buf,packet_pointer->len,packet_pointer->iface);
+            }
+            sr_arpcache_destroy(&(sr->cache),arp_req);
+        }
+    }
 }
 
 /*
@@ -337,4 +364,15 @@ void build_icmp_header(sr_icmp_t3_hdr_t *icmp_msg_icmp, uint8_t type, uint8_t co
     icmp_msg_icmp->icmp_code = code;
     icmp_msg_icmp->icmp_sum = 0;
     icmp_msg_icmp->icmp_sum = cksum(icmp_msg_icmp, len);
+}
+
+void build_arp_header(sr_arp_hdr_t *reply_arp_hdr, struct sr_if* source_if, sr_arp_hdr_t *arp_hdr, unsigned short type) {
+  memcpy(reply_arp_hdr, arp_hdr, sizeof(sr_arp_hdr_t));
+  reply_arp_hdr->ar_op = htons(type);
+  /* scource */
+  memcpy(reply_arp_hdr->ar_sha, source_if->addr, ETHER_ADDR_LEN);
+  reply_arp_hdr->ar_sip = source_if->ip;
+  /* destination*/
+  memcpy(reply_arp_hdr->ar_tha, arp_hdr->ar_sha, ETHER_ADDR_LEN);
+  reply_arp_hdr->ar_tip = arp_hdr->ar_sip;
 }

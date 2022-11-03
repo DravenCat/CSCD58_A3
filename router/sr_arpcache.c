@@ -11,6 +11,8 @@
 #include "sr_if.h"
 #include "sr_protocol.h"
 
+
+void sr_send_arpreq(struct sr_instance *sr, struct sr_arpreq *request);
 /* 
   This function gets called every second. For each request sent out, we keep
   checking whether we should resend an request or destroy the arp request.
@@ -29,13 +31,9 @@ void sr_arpcache_sweepreqs(struct sr_instance *sr) {
 void sr_send_icmp(struct sr_instance *sr, struct sr_packet *packet){
     sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)((packet->buf + sizeof(sr_ethernet_hdr_t)));
     uint32_t ip_addr = ip_hdr->ip_src;
-    char* interface_name = get_interface_by_LPM(sr, ip_addr);
-    struct sr_if *if_1 = sr_get_interface(sr,interface_name);
-    struct sr_if *if_2 = sr_get_interface(sr,packet->iface);
+    char* interface_name = find_longest_prefix_match(sr, ip_addr);
     unsigned long icmp_length = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
-    /* uint8_t *reply = construct_icmp_header(packet->buf, if_2, 3, 1, icmp_length);  this function needs to be implemented*/
-    /*construct_eth_header(reply,((sr_ethernet_hdr_t *) packet->buf)->ether_shost, if_1->addr, ethertype_ip);  this function needs to be implemented*/
-    sr_send_packet(sr, reply, icmp_length, interface_name);
+    send_ICMP_msg(sr,packet,icmp_length,interface_name,3,1)
 }
 
 void sr_send_arpreq(struct sr_instance *sr, struct sr_arpreq *request){
