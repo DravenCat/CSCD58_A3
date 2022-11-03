@@ -107,7 +107,7 @@ void sr_handle_ip_packet(struct sr_instance *sr,
         if (dest_if) {/* to a router interface*/
             uint8_t ip_proto = ip_protocol((uint8_t *)ip_header);
 
-            if (ip_proto == ip_protocol_icmp) { // is an ICMP echo request
+            if (ip_proto == ip_protocol_icmp) { /* is an ICMP echo request*/
                 /* sanity check for ICMP */
                 if (pass_sanity_check(packet, len, ethertype_ip, ip_protocol_icmp)) {
                     sr_icmp_hdr_t *icmp_header = (sr_icmp_hdr_t *) (packet +
