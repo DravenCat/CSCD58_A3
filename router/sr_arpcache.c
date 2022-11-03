@@ -60,7 +60,7 @@ void sr_send_arpreq(struct sr_instance *sr, struct sr_arpreq *request){
     arp_hdr->ar_tip = htonl(request->ip);
     memcpy(arp_hdr->ar_sha, if_1->addr,ETHER_ADDR_LEN);
     uint8_t zeros[ETHER_ADDR_LEN] = {0x00,0x00,0x00,0x00,0x00,0x00};
-    memccpy(arp_hdr->ar_tha,,ETHER_ADDR_LEN);
+    memcpy(arp_hdr->ar_tha,zeros,ETHER_ADDR_LEN);
             
     sr_send_packet(sr,arpreq,sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t),interface_name);
     free(arpreq);
