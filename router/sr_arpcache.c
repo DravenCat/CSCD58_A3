@@ -70,7 +70,7 @@ void sr_send_arpreq(struct sr_instance *sr, struct sr_arpreq *request){
 void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *request){
     time_t now = time(NULL);
     if (difftime(now, request->sent) > 1.0){
-        if(request->time_sent >= 5){
+        if(request->times_sent >= 5){
             struct sr_packet *packet;
             for(packet=request->packets; packet!=NULL;packet=packet->next){
                 sr_send_icmp(sr,request);
@@ -78,7 +78,7 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *request){
         }else{
             sr_send_arpreq(sr,request);
             request->sent = time(NULL);
-            request->time_sent++;    
+            request->times_sent++;
         }
     }
 }
