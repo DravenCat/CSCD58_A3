@@ -155,7 +155,7 @@ void sr_handle_ip_packet(struct sr_instance *sr,
                                                                  ntohl(ip_header->ip_dst),
                                                                  packet, len,
                                                                  next_hop_ip->interface);
-                handle_arpreq(sr, arp_req);
+                sr_handle_arpreq(sr, arp_req);
             } else { /* send an ARP request for the next-hop IP */
                 sr_ethernet_hdr_t *eth_header = (sr_ethernet_hdr_t *)packet;
                 memcpy(eth_header->ether_dhost, next_hop->mac, ETHER_ADDR_LEN);
@@ -182,9 +182,10 @@ void sr_handle_arp_packet(struct sr_instance *sr,
     if(target_if && ntohs(arp_hdr->ar_op) == arp_op_request){
         fprintf(stdout,"case1.1: ------arp request------\n");
         unsigned long length = sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t);
-        uint8_t *arp_reply = (unit8_t *)malloc(length);
+        uint8_t *arp_reply = (uint8_t *)malloc(length);
         
-        build_ether_header((sr_ethernet_hdr_t *)arp_reply, eth_hdr->ether_shost, source_if->addr, ethertype_arp);
+        build_ether_header((sr_ethernet_hdr_t *)arp_reply,
+                           (uint8_t *)eth_hdr->ether_shost, source_if->addr, ethertype_arp);
         sr_arp_hdr_t *arp_reply_hdr = (sr_arp_hdr_t *)(arp_reply + sizeof(sr_ethernet_hdr_t));
         build_arp_header(arp_reply_hdr, source_if, arp_hdr, arp_op_reply);
 
@@ -192,15 +193,16 @@ void sr_handle_arp_packet(struct sr_instance *sr,
         free(arp_reply);
     }else if(target_if && ntohs(arp_hdr->ar_op) == arp_op_reply){
         fprintf(stdout,"---------- case1.2: arp_response");
-        struct sr_arpreq *arp_req = sr_arpcache_insert(&(sr->cache), arp_hdr->ar_sha, ntohl(arp_hdr->ar_sip));
+        struct sr_arpreq *arp_req = sr_arpcache_insert(&(sr->cache),
+                arp_hdr->ar_sha, ntohl(arp_hdr->ar_sip));
         if(arp_req){
-            struct sr_packact* packet_pointer;
+            struct sr_packet* packet_pointer;
             for(packet_pointer=arp_req->packets;packet_pointer!=NULL;packet_pointer=packet_pointer->next){
                 sr_ethernet_hdr_t *arp_req_eth = (sr_ethernet_hdr_t *)packet_pointer->buf;
                 build_ether_header(arp_req_eth, arp_hdr->ar_sha, source_if->addr, ethertype(packet_pointer->buf) );
                 sr_send_packet(sr,packet_pointer->buf,packet_pointer->len,packet_pointer->iface);
             }
-            sr_arpcache_destroy(&(sr->cache),arp_req);
+            sr_arpreq_destroy(&(sr->cache),arp_req);
         }
     }
 }
@@ -259,7 +261,8 @@ int pass_sanity_check(uint8_t *packet, unsigned int len, uint16_t ether_type, ui
 }
 
 struct sr_if *get_interface_through_ip(struct sr_instance *sr, uint32_t dest_addr) {
-    for (struct sr_if *pos = sr->if_list; pos != NULL; pos = pos->next) {
+    struct sr_if *pos = sr->if_list;
+    for (; pos != NULL; pos = pos->next) {
         if (dest_addr == pos->ip) return pos;
     }
     return NULL;
@@ -326,8 +329,9 @@ void send_ICMP_msg(struct sr_instance *sr,
 
 struct sr_rt *find_longest_prefix_match(struct sr_instance *sr, uint32_t dest_addr) {
     struct sr_rt *longest_match = sr->routing_table;
+    struct sr_rt *r_table = sr->routing_table;
 
-    for (struct sr_rt *r_table = sr->routing_table; r_table != NULL; r_table = r_table->next) {
+    for (; r_table != NULL; r_table = r_table->next) {
         uint32_t d1 = ntohl(dest_addr) & r_table->mask.s_addr;
         if (ntohl(r_table->gw.s_addr) == d1) {
             if(r_table->mask.s_addr > longest_match->mask.s_addr) {
