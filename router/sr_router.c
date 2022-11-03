@@ -146,8 +146,7 @@ void sr_handlepacket(struct sr_instance* sr,
 
   /* case2: is an ip request */
   else if (ethtype == ethertype_ip) {
-    uint8_t *ip_buf = packet+sizeof(sr_ethernet_hdr_t);
-    sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)ip_buf;
+    sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(packet+sizeof(sr_ethernet_hdr_t));
     struct sr_if *target_if = get_interface_by_ip(sr, ip_hdr->ip_dst);
     fprintf(stdout, "It's TTL is: %d\n", ip_hdr->ip_ttl);
 
@@ -168,7 +167,8 @@ void sr_handlepacket(struct sr_instance* sr,
         /* construct ethernet header */
         build_ether_header((sr_ethernet_hdr_t *)packet, ehdr->ether_shost, source_if->addr, ethertype_ip);
         /* construct ip header */
-        construct_ip_header(ip_buf, ip_hdr->ip_src, ip_hdr->ip_dst, ip_protocol_icmp);
+          build_ip_header(ip_hdr, ip_hdr->ip_len,
+                          ip_hdr->ip_dst, ip_hdr->ip_src, ip_protocol_icmp);
         sr_icmp_hdr_t *icmp_hdr = (sr_icmp_hdr_t *)(packet+sizeof(sr_ethernet_hdr_t)+sizeof(sr_ip_hdr_t));
         if (icmp_hdr->icmp_type == (uint8_t)8) {
           fprintf(stderr, "sending an ICMP echo response\n");
@@ -264,15 +264,6 @@ void construct_arp_header(uint8_t *buf, struct sr_if* source_if, sr_arp_hdr_t *a
   reply_arp_hdr->ar_tip = arp_hdr->ar_sip;
 }
 
-void construct_ip_header(uint8_t *buf, uint32_t dst, uint32_t src, uint16_t type) {
-  sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(buf);
-  ip_hdr->ip_src = src;
-  ip_hdr->ip_dst = dst;
-  ip_hdr->ip_p = type;
-  ip_hdr->ip_sum = 0;
-  ip_hdr->ip_sum = cksum(ip_hdr, sizeof(sr_ip_hdr_t));
-}
-
 uint8_t* construct_icmp_header(uint8_t *buf, struct sr_if* source_if, uint8_t type, uint8_t code, unsigned long total_len) {
   sr_ethernet_hdr_t *ehdr = (sr_ethernet_hdr_t *)buf;
   sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(buf + sizeof(sr_ethernet_hdr_t));
@@ -292,14 +283,10 @@ uint8_t* construct_icmp_header(uint8_t *buf, struct sr_if* source_if, uint8_t ty
     /* construct ethernet header */
     build_ether_header((sr_ethernet_hdr_t *)reply, ehdr->ether_shost, source_if->addr, ethertype_ip);
     /* construct ip header */
-    uint8_t *reply_ip_buf = reply + sizeof(sr_ethernet_hdr_t);
-    memcpy(reply_ip_buf, ip_hdr, sizeof(sr_ip_hdr_t));
-    sr_ip_hdr_t *reply_ip = (sr_ip_hdr_t *) reply_ip_buf;
-    reply_ip->ip_len = htons(sizeof(sr_ip_hdr_t)+sizeof(sr_icmp_t3_hdr_t));
-    if (type == 11) {
-      reply_ip->ip_ttl = 100;
-    }
-    construct_ip_header(reply_ip_buf, ip_hdr->ip_src, source_if->ip, ip_protocol_icmp);
+      sr_ip_hdr_t *reply_ip_buf = (sr_ip_hdr_t *)(reply + sizeof(sr_ethernet_hdr_t));
+      memcpy(reply_ip_buf, ip_hdr, sizeof(sr_ip_hdr_t));
+      build_ip_header(reply_ip_buf, htons(sizeof(sr_ip_hdr_t)+sizeof(sr_icmp_t3_hdr_t)),
+                      source_if->ip, ip_hdr->ip_src, ip_protocol_icmp);
     /* construct icmp header */
     sr_icmp_t3_hdr_t *reply_icmp_hdr = (sr_icmp_t3_hdr_t *)(reply_ip_buf + sizeof(sr_ip_hdr_t));
     reply_icmp_hdr->icmp_type = type;
@@ -398,7 +385,7 @@ void build_ip_header(sr_ip_hdr_t *icmp_msg_ip, uint16_t ip_len, const uint8_t *s
     icmp_msg_ip->ip_len = ip_len;
     icmp_msg_ip->ip_src = src;
     icmp_msg_ip->ip_dst = dst;
-    icmp_msg_ip->ip_ttl = INIT_TTL;
+    icmp_msg_ip->ip_ttl = ip_p == 3 ? icmp_msg_ip->ip_ttl : INIT_TTL;
     icmp_msg_ip->ip_p = ip_p;
     icmp_msg_ip->ip_sum = 0;
     icmp_msg_ip->ip_sum = cksum(icmp_msg_ip, sizeof(sr_ip_hdr_t));
