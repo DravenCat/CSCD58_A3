@@ -12,7 +12,6 @@
 #include "sr_protocol.h"
 
 
-void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *request);
 /* 
   This function gets called every second. For each request sent out, we keep
   checking whether we should resend an request or destroy the arp request.
@@ -33,7 +32,7 @@ void sr_send_icmp(struct sr_instance *sr, struct sr_packet *packet){
     uint32_t ip_addr = ip_hdr->ip_src;
     char* interface_name = find_longest_prefix_name(sr, ip_addr);
     unsigned long icmp_length = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
-    send_ICMP_msg(sr,packet,icmp_length,interface_name,3,1)
+    send_ICMP_msg(sr,(uint8_t *)packet,icmp_length,interface_name,3,1);
 }
 
 void sr_send_arpreq(struct sr_instance *sr, struct sr_arpreq *request){
