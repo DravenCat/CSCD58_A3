@@ -38,7 +38,9 @@ void sr_send_icmp(struct sr_instance *sr, struct sr_packet *packet) {
     unsigned long icmp_length = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
 
     uint8_t *reply = construct_icmp_header(packet->buf, iif, 3, 1, icmp_length);
-    construct_eth_header(reply, ((sr_ethernet_hdr_t *) packet->buf)->ether_shost, oif->addr, ethertype_ip);
+    build_ether_header((sr_ethernet_hdr_t *)reply,
+                       ((sr_ethernet_hdr_t *) packet->buf)->ether_shost,
+                       oif->addr, ethertype_ip);
     fprintf(stdout, "sending ICMP (Type 3, Code 1) unreachable\n");
     sr_send_packet(sr, reply, icmp_length, interface_name);
 }

@@ -393,3 +393,9 @@ struct sr_rt *find_longest_prefix_match(struct sr_instance *sr, uint32_t dest_ad
 char *find_longest_prefix_name(struct sr_instance *sr, uint32_t dest_addr) {
     return find_longest_prefix_match(sr, dest_addr)->interface;
 }
+
+void build_ether_header(sr_ethernet_hdr_t *icmp_msg_eth, uint8_t *dhost, uint8_t *shost, uint16_t type) {
+    memcpy(icmp_msg_eth->ether_dhost, dhost, sizeof(uint8_t) * ETHER_ADDR_LEN);
+    memcpy(icmp_msg_eth->ether_shost, shost, sizeof(uint8_t) * ETHER_ADDR_LEN);
+    icmp_msg_eth->ether_type = htons(type);
+}
