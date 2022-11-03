@@ -118,7 +118,7 @@ void sr_handlepacket(struct sr_instance* sr,
       uint8_t *arp_reply = (uint8_t *)malloc(reply_len);
       
       /* construct ethernet header */
-      construct_eth_header(arp_reply, ehdr->ether_shost, source_if->addr, ethertype_arp);
+      build_ether_header((sr_ethernet_hdr_t *)arp_reply, ehdr->ether_shost, source_if->addr, ethertype_arp);
 
       /* construct arp header */
       construct_arp_header(arp_reply + sizeof(sr_ethernet_hdr_t), source_if, arp_hdr, arp_op_reply);
@@ -136,7 +136,7 @@ void sr_handlepacket(struct sr_instance* sr,
       if (arpreq) {
         struct sr_packet *pkt;
         for (pkt=arpreq->packets; pkt != NULL; pkt=pkt->next) {
-          construct_eth_header(pkt->buf, arp_hdr->ar_sha, source_if->addr, ethertype(pkt->buf));
+          build_ether_header((sr_ethernet_hdr_t *)pkt->buf, arp_hdr->ar_sha, source_if->addr, ethertype(pkt->buf));
           sr_send_packet(sr, pkt->buf, pkt->len, pkt->iface);
         }
         sr_arpreq_destroy(&(sr->cache), arpreq);
@@ -166,7 +166,7 @@ void sr_handlepacket(struct sr_instance* sr,
       if (protocol == ip_protocol_icmp) {
         fprintf(stderr, "---------case2.1.1: icmp ----------\n");
         /* construct ethernet header */
-        construct_eth_header(packet, ehdr->ether_shost, source_if->addr, ethertype_ip);
+        build_ether_header((sr_ethernet_hdr_t *)packet, ehdr->ether_shost, source_if->addr, ethertype_ip);
         /* construct ip header */
         construct_ip_header(ip_buf, ip_hdr->ip_src, ip_hdr->ip_dst, ip_protocol_icmp);
         sr_icmp_hdr_t *icmp_hdr = (sr_icmp_hdr_t *)(packet+sizeof(sr_ethernet_hdr_t)+sizeof(sr_ip_hdr_t));
@@ -251,12 +251,6 @@ void sr_handlepacket(struct sr_instance* sr,
 
 }/* end sr_ForwardPacket */
 
-void construct_eth_header(uint8_t *buf, uint8_t *dst, uint8_t *src, uint16_t type) {
-  sr_ethernet_hdr_t *reply_ehdr = (sr_ethernet_hdr_t *)buf;
-  memcpy(reply_ehdr->ether_dhost, dst, ETHER_ADDR_LEN);
-  memcpy(reply_ehdr->ether_shost, src, ETHER_ADDR_LEN);
-  reply_ehdr->ether_type = htons(type);
-}
 
 void construct_arp_header(uint8_t *buf, struct sr_if* source_if, sr_arp_hdr_t *arp_hdr, unsigned short type) {
   sr_arp_hdr_t *reply_arp_hdr = (sr_arp_hdr_t *)buf;
@@ -296,7 +290,7 @@ uint8_t* construct_icmp_header(uint8_t *buf, struct sr_if* source_if, uint8_t ty
     unsigned long new_len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
     reply = (uint8_t *)malloc(new_len);
     /* construct ethernet header */
-    construct_eth_header(reply, ehdr->ether_shost, source_if->addr, ethertype_ip);
+    build_ether_header((sr_ethernet_hdr_t *)reply, ehdr->ether_shost, source_if->addr, ethertype_ip);
     /* construct ip header */
     uint8_t *reply_ip_buf = reply + sizeof(sr_ethernet_hdr_t);
     memcpy(reply_ip_buf, ip_hdr, sizeof(sr_ip_hdr_t));
@@ -398,4 +392,14 @@ void build_ether_header(sr_ethernet_hdr_t *icmp_msg_eth, uint8_t *dhost, uint8_t
     memcpy(icmp_msg_eth->ether_dhost, dhost, sizeof(uint8_t) * ETHER_ADDR_LEN);
     memcpy(icmp_msg_eth->ether_shost, shost, sizeof(uint8_t) * ETHER_ADDR_LEN);
     icmp_msg_eth->ether_type = htons(type);
+}
+
+void build_ip_header(sr_ip_hdr_t *icmp_msg_ip, uint16_t ip_len, const uint8_t *src, const uint8_t *dst, uint8_t ip_p) {
+    icmp_msg_ip->ip_len = ip_len;
+    icmp_msg_ip->ip_src = src;
+    icmp_msg_ip->ip_dst = dst;
+    icmp_msg_ip->ip_ttl = INIT_TTL;
+    icmp_msg_ip->ip_p = ip_p;
+    icmp_msg_ip->ip_sum = 0;
+    icmp_msg_ip->ip_sum = cksum(icmp_msg_ip, sizeof(sr_ip_hdr_t));
 }
