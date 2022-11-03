@@ -244,7 +244,7 @@ void sr_handlepacket(struct sr_instance* sr,
       }
       else {
         struct sr_arpreq *req = sr_arpcache_queuereq(&(sr->cache), ntohl(ip_hdr->ip_dst), packet, len, oif_name);
-        handle_arpreq(sr, req);
+          sr_handle_arprequest(sr, req);
       }
     }
   }
