@@ -12,7 +12,7 @@
 #include "sr_protocol.h"
 
 
-void sr_send_arpreq(struct sr_instance *sr, struct sr_arpreq *request);
+void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *request);
 /* 
   This function gets called every second. For each request sent out, we keep
   checking whether we should resend an request or destroy the arp request.
