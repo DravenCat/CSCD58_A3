@@ -146,8 +146,6 @@ void sr_arpcache_dump(struct sr_arpcache *cache);
 int   sr_arpcache_init(struct sr_arpcache *cache);
 int   sr_arpcache_destroy(struct sr_arpcache *cache);
 void *sr_arpcache_timeout(void *cache_ptr);
-
-
-void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *request);
-
+void handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req);
+uint8_t* construct_icmp_header(uint8_t *buf, struct sr_if* source_if, uint8_t type, uint8_t code, unsigned long total_len);
 #endif
