@@ -180,17 +180,18 @@ void sr_handle_arp_packet(struct sr_instance *sr,
     sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(packet+sizeof(sr_ethernet_hdr_t));
     struct sr_if *target_if = get_interface_through_ip(sr,arp_hdr->ar_tip);
     if(target_if && ntohs(arp_hdr->ar_op) == arp_op_request){
+        fprintf(stdout,"case1.1: ------arp request------\n");
         unsigned long length = sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t);
         uint8_t *arp_reply = (unit8_t *)malloc(length);
         
-
-        sr_ethernet_hdr_t *arp_reply_eth = (sr_ethernet_hdr_t *)arp_reply;
-        build_ether_header(arp_reply_eth, eth_hdr->ether_shost, source_if->addr, ethertype_arp);
+        build_ether_header((sr_ethernet_hdr_t *)arp_reply, eth_hdr->ether_shost, source_if->addr, ethertype_arp);
         sr_arp_hdr_t *arp_reply_hdr = (sr_arp_hdr_t *)(arp_reply + sizeof(sr_ethernet_hdr_t));
         build_arp_header(arp_reply_hdr, source_if, arp_hdr, arp_op_reply);
 
         sr_send_packet(sr,arp_reply,length,source_if->name);
+        free(arp_reply);
     }else if(target_if && ntohs(arp_hdr->ar_op) == arp_op_reply){
+        fprintf(stdout,"---------- case1.2: arp_response");
         struct sr_arpreq *arp_req = sr_arpcache_insert(&(sr->cache), arp_hdr->ar_sha, ntohl(arp_hdr->ar_sip));
         if(arp_req){
             struct sr_packact* packet_pointer;
