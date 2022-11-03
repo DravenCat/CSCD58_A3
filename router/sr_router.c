@@ -220,7 +220,7 @@ void sr_handlepacket(struct sr_instance* sr,
 
       /* Find out which entry in the routing table has the longest prefix match 
          with the destination IP address. */
-      char *oif_name = get_interface_by_LPM(sr, ip_hdr->ip_dst);
+      char *oif_name = find_longest_prefix_name(sr, ip_hdr->ip_dst);
       if (oif_name == NULL) {
    
         /* construct icmp echo response */
@@ -319,24 +319,6 @@ uint8_t* construct_icmp_header(uint8_t *buf, struct sr_if* source_if, uint8_t ty
   return reply;
 }
 
-/* Get interface name by longest prefix match */
-char* get_interface_by_LPM(struct sr_instance* sr, uint32_t ip_dst) {
-  struct sr_rt *entry = sr->routing_table;
-  struct sr_rt *match = NULL;
-  int longest_mask = 0;
-  while (entry) {
-    uint32_t netid = ntohl(ip_dst) & entry->mask.s_addr;
-    if (ntohl(entry->gw.s_addr) == netid) {
-      if (longest_mask < entry->mask.s_addr) {
-        longest_mask = entry->mask.s_addr;
-        match = entry;
-      }
-    }
-    entry = entry->next;
-  }
-  return match != NULL ? match->interface : NULL;
-}
-
 /* Get interface object by exact match */
 struct sr_if* get_interface_by_ip(struct sr_instance* sr, uint32_t tip) {
   struct sr_if *if_walker = sr->if_list;
@@ -389,4 +371,25 @@ int sanity_check(uint8_t *buf, unsigned int length) {
     return -1;
   }
   return 0;
+}
+
+struct sr_rt *find_longest_prefix_match(struct sr_instance *sr, uint32_t dest_addr) {
+    struct sr_rt *longest_match = sr->routing_table;
+    struct sr_rt *r_table = sr->routing_table;
+
+    for (; r_table != NULL; r_table = r_table->next) {
+        uint32_t d1 = ntohl(dest_addr) & r_table->mask.s_addr;
+        if (ntohl(r_table->gw.s_addr) == d1) {
+            if(r_table->mask.s_addr > longest_match->mask.s_addr) {
+                longest_match = r_table;
+            }
+        }
+    }
+
+    return longest_match;
+}
+
+
+char *find_longest_prefix_name(struct sr_instance *sr, uint32_t dest_addr) {
+    return find_longest_prefix_match(sr, dest_addr)->interface;
 }
