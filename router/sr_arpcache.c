@@ -31,7 +31,7 @@ void sr_arpcache_sweepreqs(struct sr_instance *sr) {
 void sr_send_icmp(struct sr_instance *sr, struct sr_packet *packet){
     sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)((packet->buf + sizeof(sr_ethernet_hdr_t)));
     uint32_t ip_addr = ip_hdr->ip_src;
-    char* interface_name = find_longest_prefix_match(sr, ip_addr);
+    char* interface_name = find_longest_prefix_name(sr, ip_addr);
     unsigned long icmp_length = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
     send_ICMP_msg(sr,packet,icmp_length,interface_name,3,1)
 }
@@ -73,7 +73,7 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *request){
         if(request->times_sent >= 5){
             struct sr_packet *packet;
             for(packet=request->packets; packet!=NULL;packet=packet->next){
-                sr_send_icmp(sr,request);
+                sr_send_icmp(sr,packet);
             }
         }else{
             sr_send_arpreq(sr,request);
