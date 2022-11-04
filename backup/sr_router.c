@@ -355,14 +355,16 @@ void sr_handle_arp_packet(struct sr_instance *sr,
 }
 
 struct sr_rt *find_longest_prefix_match(struct sr_instance *sr, uint32_t dest_addr) {
-    struct sr_rt *longest_match = sr->routing_table;
+    struct sr_rt *longest_match = NULL;
+    uint32_t longest_int = 0;
     struct sr_rt *r_table = sr->routing_table;
 
     for (; r_table != NULL; r_table = r_table->next) {
         uint32_t d1 = ntohl(dest_addr) & r_table->mask.s_addr;
         if (ntohl(r_table->gw.s_addr) == d1) {
-            if(r_table->mask.s_addr > longest_match->mask.s_addr) {
+            if(r_table->mask.s_addr > longest_int) {
                 longest_match = r_table;
+                longest_int = r_table->mask.s_addr;
             }
         }
     }
@@ -372,7 +374,11 @@ struct sr_rt *find_longest_prefix_match(struct sr_instance *sr, uint32_t dest_ad
 
 
 char *find_longest_prefix_name(struct sr_instance *sr, uint32_t dest_addr) {
-    return find_longest_prefix_match(sr, dest_addr)->interface;
+    struct sr_rt *res = find_longest_prefix_match(sr, dest_addr);
+    if (res) {
+        return res->interface;
+    }
+    return NULL;
 }
 
 void build_ether_header(sr_ethernet_hdr_t *icmp_msg_eth, uint8_t *dhost, uint8_t *shost, uint16_t type) {
