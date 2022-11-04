@@ -187,14 +187,14 @@ void sr_handle_ip_packet(struct sr_instance *sr,
                     return;
                 }
 
-                send_ICMP_msg(sr, packet, len, interface, 0, 0, iface);
+                send_ICMP_msg(sr, packet, len, interface, 0, 0, iface, iface);
                 fprintf(stdout, "Echo reply (type 0)\n");
             }
 
         /* If the packet contains a TCP or UDP payload, send an ICMP port unreachable to the sending host.*/
         } else if (protocol == ip_protocol_tcp || protocol == ip_protocol_udp) {
             /* Port unreachable. Sent ICMP message with type 3 code 3 */
-            send_ICMP_msg(sr, packet, len, interface, 3, 3, iface);
+            send_ICMP_msg(sr, packet, len, interface, 3, 3, iface, iface);
             fprintf(stdout, "Port unreachable (type 3, code 3)\n");
         }
 
@@ -208,7 +208,7 @@ void sr_handle_ip_packet(struct sr_instance *sr,
         /* Sent if an IP packet is discarded during processing because the TTL field is 0 */
         if (packet_ip->ip_ttl < 0) {
             /* build icmp echo response */
-            send_ICMP_msg(sr, packet, len, interface, 11, 0, iface);
+            send_ICMP_msg(sr, packet, len, interface, 11, 0, iface, iface);
             fprintf(stdout, "Time exceeded (type 11, code 0)\n");
             return;
         }
@@ -218,7 +218,7 @@ void sr_handle_ip_packet(struct sr_instance *sr,
         if (iface_name == NULL) {
 
             /* build icmp echo response */
-            send_ICMP_msg(sr, packet, len, interface, 3, 0, iface);
+            send_ICMP_msg(sr, packet, len, interface, 3, 0, iface, iface);
             fprintf(stdout, "Destination net unreachable (type 3, code 0)\n");
             return;
         }
@@ -376,7 +376,7 @@ void send_ICMP_msg(struct sr_instance *sr,
                    uint8_t *packet,
                    unsigned int len,
                    char *interface,
-                   uint8_t type, uint8_t code, struct sr_if *iface) {
+                   uint8_t type, uint8_t code, struct sr_if *eface, struct sr_if *ipface) {
 
     sr_ethernet_hdr_t *packet_eth = (sr_ethernet_hdr_t *)packet;
     sr_ip_hdr_t *packet_ip = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
@@ -392,7 +392,7 @@ void send_ICMP_msg(struct sr_instance *sr,
 
 
     /* build ethernet header */
-    build_ether_header((sr_ethernet_hdr_t *)reply, (uint8_t *)packet_eth->ether_shost, iface->addr, ethertype_ip);
+    build_ether_header((sr_ethernet_hdr_t *)reply, (uint8_t *)packet_eth->ether_shost, eface->addr, ethertype_ip);
 
     uint8_t *reply_ip_buf = reply + sizeof(sr_ethernet_hdr_t);
 
@@ -400,7 +400,7 @@ void send_ICMP_msg(struct sr_instance *sr,
         /* build ip header */
         memcpy(reply_ip_buf, packet_ip, sizeof(sr_ip_hdr_t));
         build_ip_header((sr_ip_hdr_t *) reply_ip_buf, htons(sizeof(sr_ip_hdr_t)+sizeof(sr_icmp_t3_hdr_t)),
-                        iface->ip, packet_ip->ip_src, ip_protocol_icmp);
+                        ipface->ip, packet_ip->ip_src, ip_protocol_icmp);
 
         /* build icmp t3 header */
         sr_icmp_t3_hdr_t *reply_icmp_t3_hdr = (sr_icmp_t3_hdr_t *) (reply_ip_buf + sizeof(sr_ip_hdr_t));

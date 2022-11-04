@@ -27,30 +27,12 @@ void sr_arpcache_sweepreqs(struct sr_instance *sr) {
 
 void sr_send_icmp(struct sr_instance *sr, struct sr_packet *packet) {
     sr_ip_hdr_t *packet_ip = (sr_ip_hdr_t *)((packet->buf + sizeof(sr_ethernet_hdr_t)));
-    char *interface_name = find_longest_prefix_name(sr, packet_ip->ip_src);
-    /* construct icmp unreachable response */
-    unsigned long msg_length = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
+    char *interface = find_longest_prefix_name(sr, packet_ip->ip_src);
 
-    struct sr_if *out_iface = sr_get_interface(sr, interface_name);
-    struct sr_if *source_iface = sr_get_interface(sr, packet->iface);
+    struct sr_if *eface = sr_get_interface(sr, interface);
+    struct sr_if *ipface = sr_get_interface(sr, packet->iface);
 
-    uint8_t * reply_msg = (uint8_t *) malloc(sizeof(sr_ethernet_hdr_t) +
-                                             sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t));
-
-    build_ether_header((sr_ethernet_hdr_t *)reply_msg,
-                       ((sr_ethernet_hdr_t *) packet->buf)->ether_shost,
-                       out_iface->addr, ethertype_ip);
-
-    sr_ip_hdr_t *reply_msg_ip = (sr_ip_hdr_t *)(reply_msg + sizeof(sr_ethernet_hdr_t));
-    memcpy(reply_msg_ip, packet_ip, sizeof(sr_ip_hdr_t));
-    build_ip_header(reply_msg_ip, htons(sizeof(sr_ip_hdr_t)+sizeof(sr_icmp_t3_hdr_t)),
-                    source_iface->ip, packet_ip->ip_src, ip_protocol_icmp);
-
-    sr_icmp_t3_hdr_t *reply_msg_icmp = (sr_icmp_t3_hdr_t *) (reply_msg_ip + sizeof(sr_ip_hdr_t));
-    build_icmp_type3_header(reply_msg_icmp, 3, 1, (uint8_t *)packet_ip);
-
-    sr_send_packet(sr, reply_msg, msg_length, interface_name);
-    free(reply_msg);
+    send_ICMP_msg(sr, packet->buf, 0, interface, 3, 1, eface, ipface);
     fprintf(stdout, "Destination host unreachable (type 3, code 1) \n");
 }
 

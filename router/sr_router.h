@@ -90,7 +90,7 @@ void send_ICMP_msg(struct sr_instance *sr,
                    uint8_t *packet,
                    unsigned int len,
                    char *interface,
-                   uint8_t type, uint8_t code, struct sr_if *iface);
+                   uint8_t type, uint8_t code, struct sr_if *eface, struct sr_if *ipface);
 
 /* -- sr_if.c -- */
 void sr_add_interface(struct sr_instance* , const char* );
