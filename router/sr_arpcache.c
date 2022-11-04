@@ -27,20 +27,33 @@ void sr_arpcache_sweepreqs(struct sr_instance *sr) {
 }
 
 void sr_send_icmp(struct sr_instance *sr, struct sr_packet *packet) {
-    sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)((packet->buf + sizeof(sr_ethernet_hdr_t)));
-    uint32_t ip_addr = ip_hdr->ip_src;
+    sr_ip_hdr_t *packet_ip = (sr_ip_hdr_t *)((packet->buf + sizeof(sr_ethernet_hdr_t)));
+    uint32_t ip_addr = packet_ip->ip_src;
     char *interface_name = find_longest_prefix_name(sr, ip_addr);
     /* construct icmp unreachable response */
-    unsigned long icmp_length = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
+    unsigned long msg_length = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
 
-    struct sr_if *oif = sr_get_interface(sr, interface_name);
-    struct sr_if *iif = sr_get_interface(sr, packet->iface);
-    uint8_t *reply = construct_icmp_header(packet->buf, iif, 3, 1, icmp_length);
-    build_ether_header((sr_ethernet_hdr_t *)reply,
+    struct sr_if *out_iface = sr_get_interface(sr, interface_name);
+    struct sr_if *source_iface = sr_get_interface(sr, packet->iface);
+
+    uint8_t * reply_msg = (uint8_t *) malloc(sizeof(sr_ethernet_hdr_t) +
+                                               sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t));
+
+    build_ether_header((sr_ethernet_hdr_t *)reply_msg,
                        ((sr_ethernet_hdr_t *) packet->buf)->ether_shost,
-                       oif->addr, ethertype_ip);
-    fprintf(stdout, "sending ICMP (Type 3, Code 1) unreachable\n");
-    sr_send_packet(sr, reply, icmp_length, interface_name);
+                       out_iface->addr, ethertype_ip);
+
+    sr_ip_hdr_t *reply_msg_ip = (sr_ip_hdr_t *)(reply_msg + sizeof(sr_ethernet_hdr_t));
+    memcpy(reply_msg_ip, packet_ip, sizeof(sr_ip_hdr_t));
+    build_ip_header(reply_msg_ip, htons(sizeof(sr_ip_hdr_t)+sizeof(sr_icmp_t3_hdr_t)),
+                    source_iface->ip, packet_ip->ip_src, ip_protocol_icmp);
+
+    sr_icmp_t3_hdr_t *reply_msg_icmp = (sr_icmp_t3_hdr_t *) (reply_msg_ip + sizeof(sr_ip_hdr_t));
+    memcpy(reply_msg_icmp->data, packet_ip, ICMP_DATA_SIZE);
+    build_icmp_header(reply_msg_icmp, 3, 1, sizeof(sr_icmp_t3_hdr_t));
+
+    sr_send_packet(sr, reply_msg, msg_length, interface_name);
+    free(reply_msg);
 }
 
 void sr_send_arpreq(struct sr_instance *sr, struct sr_arpreq *request) {
