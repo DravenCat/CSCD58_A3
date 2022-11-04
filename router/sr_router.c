@@ -390,3 +390,69 @@ int sanity_check(uint8_t *buf, unsigned int length) {
   }
   return 0;
 }
+
+struct sr_if *get_interface_through_ip(struct sr_instance *sr, uint32_t dest_addr) {
+    struct sr_if *pos = sr->if_list;
+    for (; pos != NULL; pos = pos->next) {
+        if (dest_addr == pos->ip) return pos;
+    }
+    return NULL;
+}
+
+struct sr_rt *find_longest_prefix_match(struct sr_instance *sr, uint32_t dest_addr) {
+    struct sr_rt *longest_match = sr->routing_table;
+    struct sr_rt *r_table = sr->routing_table;
+
+    for (; r_table != NULL; r_table = r_table->next) {
+        uint32_t d1 = ntohl(dest_addr) & r_table->mask.s_addr;
+        if (ntohl(r_table->gw.s_addr) == d1) {
+            if(r_table->mask.s_addr > longest_match->mask.s_addr) {
+                longest_match = r_table;
+            }
+        }
+    }
+
+    return longest_match;
+}
+
+
+char *find_longest_prefix_name(struct sr_instance *sr, uint32_t dest_addr) {
+    return find_longest_prefix_match(sr, dest_addr)->interface;
+}
+
+void build_ether_header(sr_ethernet_hdr_t *icmp_msg_eth, uint8_t *dhost, uint8_t *shost, uint16_t type) {
+    memcpy(icmp_msg_eth->ether_dhost, dhost, sizeof(uint8_t) * ETHER_ADDR_LEN);
+    memcpy(icmp_msg_eth->ether_shost, shost, sizeof(uint8_t) * ETHER_ADDR_LEN);
+    icmp_msg_eth->ether_type = htons(type);
+}
+
+void build_ip_header(sr_ip_hdr_t *icmp_msg_ip, uint16_t ip_len, const uint8_t *src, const uint8_t *dst, uint8_t ip_p) {
+    icmp_msg_ip->ip_len = ip_len;
+    icmp_msg_ip->ip_src = src;
+    icmp_msg_ip->ip_dst = dst;
+    icmp_msg_ip->ip_ttl = ip_p == 3 ? icmp_msg_ip->ip_ttl : INIT_TTL;
+    icmp_msg_ip->ip_p = ip_p;
+    icmp_msg_ip->ip_sum = 0;
+    icmp_msg_ip->ip_sum = cksum(icmp_msg_ip, sizeof(sr_ip_hdr_t));
+}
+
+void build_icmp_header(sr_icmp_t3_hdr_t *icmp_msg_icmp, uint8_t type, uint8_t code, int len) {
+    icmp_msg_icmp->icmp_type = type;
+    icmp_msg_icmp->icmp_code = code;
+    icmp_msg_icmp->icmp_sum = 0;
+    icmp_msg_icmp->unused = 0;
+    icmp_msg_icmp->next_mtu = 0;
+    icmp_msg_icmp->icmp_sum = cksum(icmp_msg_icmp, len);
+}
+
+void build_arp_header(sr_arp_hdr_t *arp_header, struct sr_if* interface,
+                      sr_arp_hdr_t *arp_hdr, unsigned short type) {
+    memcpy(arp_header, arp_hdr, sizeof(sr_arp_hdr_t));
+    arp_header->ar_op = htons(type);
+    /* scource */
+    memcpy(arp_header->ar_sha, interface->addr, ETHER_ADDR_LEN);
+    arp_header->ar_sip = interface->ip;
+    /* destination*/
+    memcpy(arp_header->ar_tha, arp_hdr->ar_sha, ETHER_ADDR_LEN);
+    arp_header->ar_tip = arp_hdr->ar_sip;
+}
