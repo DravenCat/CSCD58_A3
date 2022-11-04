@@ -150,14 +150,9 @@ uint8_t* construct_icmp_header(uint8_t *buf, struct sr_if* source_if, uint8_t ty
       build_ip_header((sr_ip_hdr_t *) reply_ip_buf, htons(sizeof(sr_ip_hdr_t)+sizeof(sr_icmp_t3_hdr_t)),
                       source_if->ip, packet_ip->ip_src, ip_protocol_icmp);
     /* construct icmp header */
-    sr_icmp_t3_hdr_t *reply_icmp_hdr = (sr_icmp_t3_hdr_t *)(reply_ip_buf + sizeof(sr_ip_hdr_t));
-    reply_icmp_hdr->icmp_type = type;
-    reply_icmp_hdr->icmp_code = code;
-    reply_icmp_hdr->icmp_sum = 0;
-    reply_icmp_hdr->unused = 0;
-    reply_icmp_hdr->next_mtu = 0;
-    memcpy(reply_icmp_hdr->data, packet_ip, ICMP_DATA_SIZE);
-    reply_icmp_hdr->icmp_sum = cksum(reply_icmp_hdr, sizeof(sr_icmp_t3_hdr_t));
+      sr_icmp_t3_hdr_t *reply_icmp_hdr = (sr_icmp_t3_hdr_t *)(reply_ip_buf + sizeof(sr_ip_hdr_t));
+      memcpy(reply_icmp_hdr->data, packet_ip, ICMP_DATA_SIZE);
+      build_icmp_header(reply_icmp_hdr, type, code, sizeof(sr_icmp_t3_hdr_t));
   }
   return reply;
 }
