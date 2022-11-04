@@ -235,41 +235,36 @@ void sr_handle_ip_packet(struct sr_instance *sr,
             fprintf(stderr, "---------case2.1.2: tcp/udp ----------\n");
             /* construct icmp echo response */
             send_ICMP_msg(sr, packet, len, interface, 3, 3, iface);
+            fprintf(stdout, "sending ICMP (Type 3, Code 3) unreachable\n");
         }
     }
         /* case2.2: the request does not destinate to an router interface */
     else {
         fprintf(stderr, "---------case2.2: to other place----------\n");
         /* decrement TTL by 1 */
-        packet_ip->ip_ttl = packet_ip->ip_ttl - 1;
+        packet_ip->ip_ttl--;
         packet_ip->ip_sum = 0;
         packet_ip->ip_sum = cksum(packet_ip, sizeof(sr_ip_hdr_t));
 
         /* Sent ICMP type 11 code 0, if an IP packet is discarded during processing because the TTL field is 0 */
         if (packet_ip->ip_ttl < 0) {
             /* construct icmp echo response */
-            uint8_t *reply = construct_icmp_header(packet, iface, 11, 0, len);
-            unsigned long new_len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
+            send_ICMP_msg(sr, packet, len, interface, 11, 0, iface);
             fprintf(stdout, "sending ICMP (Type 11, Code 0) unreachable\n");
-            sr_send_packet(sr, reply, new_len, iface->name);
-            free(reply);
             return;
         }
 
         /* Find out which entry in the routing table has the longest prefix match
            with the destination IP address. */
-        char *oif_name = find_longest_prefix_name(sr, packet_ip->ip_dst);
-        if (oif_name == NULL) {
+        char *iface_name = find_longest_prefix_name(sr, packet_ip->ip_dst);
+        if (iface_name == NULL) {
 
             /* construct icmp echo response */
-            uint8_t *reply = construct_icmp_header(packet, iface, 3, 0, len);
-            unsigned long new_len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
+            send_ICMP_msg(sr, packet, len, interface, 3, 0, iface);
             fprintf(stdout, "sending ICMP (Type 3, Code 0) unreachable\n");
-            sr_send_packet(sr, reply, new_len, iface->name);
-            free(reply);
             return;
         }
-        struct sr_if *oif = sr_get_interface(sr, oif_name);
+        struct sr_if *oif = sr_get_interface(sr, iface_name);
 
         /* send packet to next_hop_ip */
         struct sr_arpentry *entry = sr_arpcache_lookup(&(sr->cache), ntohl(packet_ip->ip_dst));
@@ -277,11 +272,11 @@ void sr_handle_ip_packet(struct sr_instance *sr,
             /* use next_hop_ip->mac mapping in entry to send the packet*/
             memcpy(packet_eth->ether_dhost, entry->mac, ETHER_ADDR_LEN);
             memcpy(packet_eth->ether_shost, oif->addr, ETHER_ADDR_LEN);
-            sr_send_packet(sr, packet, len, oif_name);
+            sr_send_packet(sr, packet, len, iface_name);
             free(entry);
         }
         else {
-            struct sr_arpreq *req = sr_arpcache_queuereq(&(sr->cache), ntohl(packet_ip->ip_dst), packet, len, oif_name);
+            struct sr_arpreq *req = sr_arpcache_queuereq(&(sr->cache), ntohl(packet_ip->ip_dst), packet, len, iface_name);
             sr_handle_arprequest(sr, req);
         }
     }
@@ -431,7 +426,6 @@ void send_ICMP_msg(struct sr_instance *sr,
     memcpy(reply_icmp_hdr->data, packet_ip, ICMP_DATA_SIZE);
     build_icmp_header(reply_icmp_hdr, type, code, sizeof(sr_icmp_t3_hdr_t));
 
-    fprintf(stdout, "sending ICMP (Type 3, Code 3) unreachable\n");
     sr_send_packet(sr, reply, new_len, iface->name);
     free(reply);
 }
