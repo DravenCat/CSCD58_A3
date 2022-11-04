@@ -397,7 +397,7 @@ void build_ip_header(sr_ip_hdr_t *icmp_msg_ip, uint16_t ip_len, const uint8_t *s
     icmp_msg_ip->ip_sum = cksum(icmp_msg_ip, sizeof(sr_ip_hdr_t));
 }
 
-void build_icmp_header(sr_icmp_t3_hdr_t *icmp_msg_icmp, uint8_t type, uint8_t code, int len) {
+void build_icmp_type3_header(sr_icmp_t3_hdr_t *icmp_msg_icmp, uint8_t type, uint8_t code, int len) {
     icmp_msg_icmp->icmp_type = type;
     icmp_msg_icmp->icmp_code = code;
     icmp_msg_icmp->icmp_sum = 0;
