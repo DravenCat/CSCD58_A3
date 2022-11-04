@@ -212,6 +212,13 @@ void sr_handle_ip_packet(struct sr_instance *sr,
             sr_icmp_hdr_t *icmp_hdr = (sr_icmp_hdr_t *)(packet+sizeof(sr_ethernet_hdr_t)+sizeof(sr_ip_hdr_t));
             if (icmp_hdr->icmp_type == (uint8_t)8) {
                 fprintf(stderr, "sending an ICMP echo response\n");
+                uint16_t sum = icmp_hdr->icmp_sum;
+                icmp_hdr->icmp_sum = 0;
+                icmp_hdr->icmp_sum = cksum(icmp_hdr, len-sizeof(sr_ethernet_hdr_t)-sizeof(sr_ip_hdr_t));
+                if (sum != icmp_hdr->icmp_sum) {
+                    fprintf(stderr, "Incorrect checksum\n");
+                    return;
+                }
 
                 /* construct icmp echo response */
                 construct_icmp_header(packet, source_if, 0, 0, len);
