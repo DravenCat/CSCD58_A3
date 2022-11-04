@@ -298,6 +298,7 @@ void sr_handle_arp_packet(struct sr_instance *sr,
     }
 }
 
+/* Get the interface by address */
 struct sr_if *get_interface_through_ip(struct sr_instance *sr, uint32_t dest_addr) {
     struct sr_if *pos = sr->if_list;
     for (; pos != NULL; pos = pos->next) {
@@ -306,6 +307,7 @@ struct sr_if *get_interface_through_ip(struct sr_instance *sr, uint32_t dest_add
     return NULL;
 }
 
+/* Find the node in the routing table with the longest prefix match */
 struct sr_rt *find_longest_prefix_match(struct sr_instance *sr, uint32_t dest_addr) {
     struct sr_rt *longest_match = NULL;
     uint32_t longest_int = 0;
@@ -323,7 +325,7 @@ struct sr_rt *find_longest_prefix_match(struct sr_instance *sr, uint32_t dest_ad
     return longest_match;
 }
 
-
+/* Find the name of the node in the routing table with the longest prefix match */
 char *find_longest_prefix_name(struct sr_instance *sr, uint32_t dest_addr) {
     struct sr_rt *res = find_longest_prefix_match(sr, dest_addr);
     if (res) {
@@ -332,12 +334,14 @@ char *find_longest_prefix_name(struct sr_instance *sr, uint32_t dest_addr) {
     return NULL;
 }
 
+/* Build the ethernet header */
 void build_ether_header(sr_ethernet_hdr_t *icmp_msg_eth, uint8_t *dhost, uint8_t *shost, uint16_t type) {
     memcpy(icmp_msg_eth->ether_dhost, dhost, sizeof(uint8_t) * ETHER_ADDR_LEN);
     memcpy(icmp_msg_eth->ether_shost, shost, sizeof(uint8_t) * ETHER_ADDR_LEN);
     icmp_msg_eth->ether_type = htons(type);
 }
 
+/* Build the ip header */
 void build_ip_header(sr_ip_hdr_t *icmp_msg_ip, uint16_t ip_len, uint32_t src, uint32_t dst, uint8_t ip_p) {
     icmp_msg_ip->ip_len = ip_len;
     icmp_msg_ip->ip_src = src;
@@ -348,6 +352,7 @@ void build_ip_header(sr_ip_hdr_t *icmp_msg_ip, uint16_t ip_len, uint32_t src, ui
     icmp_msg_ip->ip_sum = cksum(icmp_msg_ip, sizeof(sr_ip_hdr_t));
 }
 
+/* Build the icmp t3 header */
 void build_icmp_header(sr_icmp_t3_hdr_t *icmp_msg_icmp, uint8_t type, uint8_t code, int len) {
     icmp_msg_icmp->icmp_type = type;
     icmp_msg_icmp->icmp_code = code;
@@ -357,18 +362,18 @@ void build_icmp_header(sr_icmp_t3_hdr_t *icmp_msg_icmp, uint8_t type, uint8_t co
     icmp_msg_icmp->icmp_sum = cksum(icmp_msg_icmp, len);
 }
 
+/* Build the arp header */
 void build_arp_header(sr_arp_hdr_t *arp_header, struct sr_if* interface,
                       sr_arp_hdr_t *arp_hdr, unsigned short type) {
     memcpy(arp_header, arp_hdr, sizeof(sr_arp_hdr_t));
     arp_header->ar_op = htons(type);
-    /* scource */
     memcpy(arp_header->ar_sha, interface->addr, ETHER_ADDR_LEN);
     arp_header->ar_sip = interface->ip;
-    /* destination*/
     memcpy(arp_header->ar_tha, arp_hdr->ar_sha, ETHER_ADDR_LEN);
     arp_header->ar_tip = arp_hdr->ar_sip;
 }
 
+/* Send the ICMP message with the specific type and code */
 void send_ICMP_msg(struct sr_instance *sr,
                    uint8_t *packet,
                    unsigned int len,
@@ -379,14 +384,17 @@ void send_ICMP_msg(struct sr_instance *sr,
     uint8_t *reply = NULL;
     unsigned long new_len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
     reply = (uint8_t *)malloc(new_len);
-    /* construct ethernet header */
-    build_ether_header((sr_ethernet_hdr_t *)reply, packet_eth->ether_shost, iface->addr, ethertype_ip);;
-    /* construct ip header */
+
+    /* build ethernet header */
+    build_ether_header((sr_ethernet_hdr_t *)reply, (uint8_t *)packet_eth->ether_shost, iface->addr, ethertype_ip);
+
+    /* build ip header */
     uint8_t *reply_ip_buf = reply + sizeof(sr_ethernet_hdr_t);
     memcpy(reply_ip_buf, packet_ip, sizeof(sr_ip_hdr_t));
     build_ip_header((sr_ip_hdr_t *) reply_ip_buf, htons(sizeof(sr_ip_hdr_t)+sizeof(sr_icmp_t3_hdr_t)),
                     iface->ip, packet_ip->ip_src, ip_protocol_icmp);
-    /* construct icmp header */
+
+    /* build icmp t3 header */
     sr_icmp_t3_hdr_t *reply_icmp_hdr = (sr_icmp_t3_hdr_t *)(reply_ip_buf + sizeof(sr_ip_hdr_t));
     memcpy(reply_icmp_hdr->data, packet_ip, ICMP_DATA_SIZE);
     build_icmp_header(reply_icmp_hdr, type, code, sizeof(sr_icmp_t3_hdr_t));
