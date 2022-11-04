@@ -48,7 +48,7 @@ void sr_send_icmp(struct sr_instance *sr, struct sr_packet *packet) {
                     source_iface->ip, packet_ip->ip_src, ip_protocol_icmp);
 
     sr_icmp_t3_hdr_t *reply_msg_icmp = (sr_icmp_t3_hdr_t *) (reply_msg_ip + sizeof(sr_ip_hdr_t));
-    build_icmp_type3_header(reply_msg_icmp, 3, 1, sizeof(sr_icmp_t3_hdr_t), (uint8_t *)packet_ip);
+    build_icmp_type3_header(reply_msg_icmp, 3, 1, (uint8_t *)packet_ip);
 
     fprintf(stdout, "Executing arp send icmp Type 3 Code 1 cksum: %d ip_src: %d ip_dst: %d\n",
             reply_msg_icmp->icmp_sum, reply_msg_ip->ip_src, reply_msg_ip->ip_dst);

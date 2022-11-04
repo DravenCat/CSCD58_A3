@@ -353,14 +353,22 @@ void build_ip_header(sr_ip_hdr_t *icmp_msg_ip, uint16_t ip_len, uint32_t src, ui
 }
 
 /* Build the icmp t3 header */
-void build_icmp_type3_header(sr_icmp_t3_hdr_t *icmp_msg_icmp, uint8_t type, uint8_t code, int len, uint8_t * data) {
+void build_icmp_type3_header(sr_icmp_t3_hdr_t *icmp_msg_icmp, uint8_t type, uint8_t code, uint8_t * data) {
     memcpy(icmp_msg_icmp->data, data, ICMP_DATA_SIZE);
     icmp_msg_icmp->icmp_type = type;
     icmp_msg_icmp->icmp_code = code;
     icmp_msg_icmp->icmp_sum = 0;
     icmp_msg_icmp->unused = 0;
     icmp_msg_icmp->next_mtu = 0;
-    icmp_msg_icmp->icmp_sum = cksum(icmp_msg_icmp, len);
+    icmp_msg_icmp->icmp_sum = cksum(icmp_msg_icmp, sizeof(sr_icmp_t3_hdr_t));
+}
+
+/* Build the icmp header */
+void build_icmp_header(sr_icmp_hdr_t *icmp_msg_icmp, uint8_t type, uint8_t code) {
+    icmp_msg_icmp->icmp_type = type;
+    icmp_msg_icmp->icmp_code = code;
+    icmp_msg_icmp->icmp_sum = 0;
+    icmp_msg_icmp->icmp_sum = cksum(icmp_msg_icmp, sizeof(sr_icmp_hdr_t));
 }
 
 /* Build the arp header */
@@ -397,9 +405,12 @@ void send_ICMP_msg(struct sr_instance *sr,
 
     /* build icmp t3 header */
     if (type == 3 || type == 11){
-        sr_icmp_t3_hdr_t *reply_icmp_hdr = (sr_icmp_t3_hdr_t *) (reply_ip_buf + sizeof(sr_ip_hdr_t));
-        build_icmp_type3_header(reply_icmp_hdr, type, code, sizeof(sr_icmp_t3_hdr_t), (uint8_t *) packet_ip);
-    } 
+        sr_icmp_t3_hdr_t *reply_icmp_t3_hdr = (sr_icmp_t3_hdr_t *) (reply_ip_buf + sizeof(sr_ip_hdr_t));
+        build_icmp_type3_header(reply_icmp_t3_hdr, type, code, (uint8_t *) packet_ip);
+    } else if (type == 0) {
+        sr_icmp_hdr_t *reply_icmp_hdr = (sr_icmp_hdr_t *) (reply_ip_buf + sizeof(sr_ip_hdr_t));
+        build_icmp_header(reply_icmp_hdr, type, code);
+    }
 
     sr_send_packet(sr, reply, new_len, iface->name);
     free(reply);
