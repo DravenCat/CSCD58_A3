@@ -27,8 +27,7 @@ void sr_arpcache_sweepreqs(struct sr_instance *sr) {
 
 void sr_send_icmp(struct sr_instance *sr, struct sr_packet *packet) {
     sr_ip_hdr_t *packet_ip = (sr_ip_hdr_t *)((packet->buf + sizeof(sr_ethernet_hdr_t)));
-    uint32_t ip_addr = packet_ip->ip_src;
-    char *interface_name = find_longest_prefix_name(sr, ip_addr);
+    char *interface_name = find_longest_prefix_name(sr, packet_ip->ip_src);
     /* construct icmp unreachable response */
     unsigned long msg_length = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
 
@@ -50,10 +49,9 @@ void sr_send_icmp(struct sr_instance *sr, struct sr_packet *packet) {
     sr_icmp_t3_hdr_t *reply_msg_icmp = (sr_icmp_t3_hdr_t *) (reply_msg_ip + sizeof(sr_ip_hdr_t));
     build_icmp_type3_header(reply_msg_icmp, 3, 1, (uint8_t *)packet_ip);
 
-    fprintf(stdout, "Executing arp send icmp Type 3 Code 1 cksum: %d ip_src: %d ip_dst: %d\n",
-            reply_msg_icmp->icmp_sum, reply_msg_ip->ip_src, reply_msg_ip->ip_dst);
     sr_send_packet(sr, reply_msg, msg_length, interface_name);
     free(reply_msg);
+    fprintf(stdout, "Destination host unreachable (type 3, code 1) \n");
 }
 
 void sr_send_arpreq(struct sr_instance *sr, struct sr_arpreq *request) {

@@ -188,6 +188,7 @@ void sr_handle_ip_packet(struct sr_instance *sr,
                 }
 
                 send_ICMP_msg(sr, packet, len, interface, 0, 0, iface);
+                fprintf(stdout, "Echo reply (type 0)\n");
             }
 
         /* If the packet contains a TCP or UDP payload, send an ICMP port unreachable to the sending host.*/
