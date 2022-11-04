@@ -121,7 +121,7 @@ void sr_handlepacket(struct sr_instance* sr,
       build_ether_header((sr_ethernet_hdr_t *)arp_reply, ehdr->ether_shost, source_if->addr, ethertype_arp);
 
       /* construct arp header */
-      construct_arp_header(arp_reply + sizeof(sr_ethernet_hdr_t), source_if, arp_hdr, arp_op_reply);
+      build_arp_header((sr_arp_hdr_t *)(arp_reply + sizeof(sr_ethernet_hdr_t)), source_if, arp_hdr, arp_op_reply);
 
       fprintf(stdout, "sending ARP reply packet\n");
       sr_send_packet(sr, arp_reply, reply_len, source_if->name);
@@ -250,19 +250,6 @@ void sr_handlepacket(struct sr_instance* sr,
   }
 
 }/* end sr_ForwardPacket */
-
-
-void construct_arp_header(uint8_t *buf, struct sr_if* source_if, sr_arp_hdr_t *arp_hdr, unsigned short type) {
-  sr_arp_hdr_t *reply_arp_hdr = (sr_arp_hdr_t *)buf;
-  memcpy(reply_arp_hdr, arp_hdr, sizeof(sr_arp_hdr_t));
-  reply_arp_hdr->ar_op = htons(type);
-  /* scource */
-  memcpy(reply_arp_hdr->ar_sha, source_if->addr, ETHER_ADDR_LEN);
-  reply_arp_hdr->ar_sip = source_if->ip;
-  /* destination*/
-  memcpy(reply_arp_hdr->ar_tha, arp_hdr->ar_sha, ETHER_ADDR_LEN);
-  reply_arp_hdr->ar_tip = arp_hdr->ar_sip;
-}
 
 uint8_t* construct_icmp_header(uint8_t *buf, struct sr_if* source_if, uint8_t type, uint8_t code, unsigned long total_len) {
   sr_ethernet_hdr_t *packet_eth = (sr_ethernet_hdr_t *)buf;
@@ -398,6 +385,18 @@ void build_icmp_header(sr_icmp_t3_hdr_t *icmp_msg_icmp, uint8_t type, uint8_t co
     icmp_msg_icmp->unused = 0;
     icmp_msg_icmp->next_mtu = 0;
     icmp_msg_icmp->icmp_sum = cksum(icmp_msg_icmp, len);
+}
+
+void build_arp_header(sr_arp_hdr_t *arp_header, struct sr_if* interface,
+                      sr_arp_hdr_t *arp_hdr, unsigned short type) {
+    memcpy(arp_header, arp_hdr, sizeof(sr_arp_hdr_t));
+    arp_header->ar_op = htons(type);
+    /* scource */
+    memcpy(arp_header->ar_sha, interface->addr, ETHER_ADDR_LEN);
+    arp_header->ar_sip = interface->ip;
+    /* destination*/
+    memcpy(arp_header->ar_tha, arp_hdr->ar_sha, ETHER_ADDR_LEN);
+    arp_header->ar_tip = arp_hdr->ar_sip;
 }
 
 void send_ICMP_msg(struct sr_instance *sr,

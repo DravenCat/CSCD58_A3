@@ -71,13 +71,13 @@ void sr_handlepacket(struct sr_instance* , uint8_t * , unsigned int , char* );
 struct sr_if* get_interface_by_ip(struct sr_instance* sr, uint32_t tip);
 int sanity_check(uint8_t *buf, unsigned int length);
 int handle_chksum(sr_ip_hdr_t *ip_hdr);
-void construct_arp_header(uint8_t *buf, struct sr_if* source_if, sr_arp_hdr_t *arp_hdr, unsigned short type);
 uint8_t* construct_icmp_header(uint8_t *ip_buf, struct sr_if* source_if, uint8_t type, uint8_t code, unsigned long total_len);
 struct sr_rt *find_longest_prefix_match(struct sr_instance *sr, uint32_t dest_addr);
 char *find_longest_prefix_name(struct sr_instance *sr, uint32_t dest_addr);
 void build_ether_header(sr_ethernet_hdr_t *icmp_msg_eth, uint8_t *dhost, uint8_t *shost, uint16_t type);
 void build_ip_header(sr_ip_hdr_t *icmp_msg_ip, uint16_t ip_len, const uint8_t *src, const uint8_t *dst, uint8_t ip_p);
 void build_icmp_header(sr_icmp_t3_hdr_t *icmp_msg_icmp, uint8_t type, uint8_t code, int len);
+void build_arp_header(sr_arp_hdr_t *arp_header, struct sr_if* interface, sr_arp_hdr_t *arp_hdr, unsigned short type);
 void send_ICMP_msg(struct sr_instance *sr,
                    uint8_t *packet,
                    unsigned int len,
