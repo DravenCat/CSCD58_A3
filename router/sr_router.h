@@ -68,7 +68,6 @@ int sr_read_from_server(struct sr_instance* );
 void sr_init(struct sr_instance* );
 void sr_handlepacket(struct sr_instance* , uint8_t * , unsigned int , char* );
 
-struct sr_if* get_interface_by_ip(struct sr_instance* sr, uint32_t tip);
 int sanity_check(uint8_t *buf, unsigned int length);
 int handle_chksum(sr_ip_hdr_t *ip_hdr);
 void construct_eth_header(uint8_t *buf, uint8_t *dst, uint8_t *src, uint16_t type);
