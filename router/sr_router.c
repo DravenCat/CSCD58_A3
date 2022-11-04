@@ -215,16 +215,11 @@ void sr_handle_ip_packet(struct sr_instance *sr,
     sr_ethernet_hdr_t *ehdr = (sr_ethernet_hdr_t *)packet;
     struct sr_if *source_if = sr_get_interface(sr, interface);
 
-    uint8_t *ip_buf = packet+sizeof(sr_ethernet_hdr_t);
-    sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)ip_buf;
+    sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(packet+sizeof(sr_ethernet_hdr_t));
     struct sr_if *target_if = get_interface_through_ip(sr, ip_hdr->ip_dst);
-    fprintf(stdout, "It's TTL is: %d\n", ip_hdr->ip_ttl);
+    fprintf(stdout, "Hello world\n");
+    fprintf(stdout, "Current TTL %d\n", ip_hdr->ip_ttl);
 
-    int success = handle_chksum(ip_hdr);
-    if (success == -1) {
-        fprintf(stderr, "IP header chsum failed!\n");
-        return;
-    }
     /* If it is sent to one of your router's IP addresses, */
     /* case2.1: the request destinates to an router interface */
     if (target_if) {
@@ -235,19 +230,13 @@ void sr_handle_ip_packet(struct sr_instance *sr,
         if (protocol == ip_protocol_icmp) {
             fprintf(stderr, "---------case2.1.1: icmp ----------\n");
             /* construct ethernet header */
-            construct_eth_header(packet, ehdr->ether_shost, source_if->addr, ethertype_ip);
+            build_ether_header((sr_ethernet_hdr_t *)packet, ehdr->ether_shost, source_if->addr, ethertype_ip);
             /* construct ip header */
-            construct_ip_header(ip_buf, ip_hdr->ip_src, ip_hdr->ip_dst, ip_protocol_icmp);
+            build_ip_header(ip_hdr, ip_hdr->ip_len,
+                            ip_hdr->ip_dst, ip_hdr->ip_src, ip_protocol_icmp);
             sr_icmp_hdr_t *icmp_hdr = (sr_icmp_hdr_t *)(packet+sizeof(sr_ethernet_hdr_t)+sizeof(sr_ip_hdr_t));
             if (icmp_hdr->icmp_type == (uint8_t)8) {
                 fprintf(stderr, "sending an ICMP echo response\n");
-                uint16_t sum = icmp_hdr->icmp_sum;
-                icmp_hdr->icmp_sum = 0;
-                icmp_hdr->icmp_sum = cksum(icmp_hdr, len-sizeof(sr_ethernet_hdr_t)-sizeof(sr_ip_hdr_t));
-                if (sum != icmp_hdr->icmp_sum) {
-                    fprintf(stderr, "Incorrect checksum\n");
-                    return;
-                }
 
                 /* construct icmp echo response */
                 construct_icmp_header(packet, source_if, 0, 0, len);
