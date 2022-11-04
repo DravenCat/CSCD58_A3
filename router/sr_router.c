@@ -350,19 +350,21 @@ void sr_handle_arp_packet(struct sr_instance *sr,
 }
 
 struct sr_rt *find_longest_prefix_match(struct sr_instance *sr, uint32_t dest_addr) {
+    struct sr_rt *r_table = NULL;
     struct sr_rt *longest_match = sr->routing_table;
-    struct sr_rt *r_table = sr->routing_table;
+    int changed = 0;
 
-    for (; r_table != NULL; r_table = r_table->next) {
+    for (r_table = sr->routing_table; r_table != NULL; r_table = r_table->next) {
         uint32_t d1 = ntohl(dest_addr) & r_table->mask.s_addr;
-        if (ntohl(r_table->gw.s_addr) == d1) {
-            if(r_table->mask.s_addr > longest_match->mask.s_addr) {
-                longest_match = r_table;
-            }
+        if ((ntohl(r_table->gw.s_addr) == d1) && (r_table->mask.s_addr >= longest_match->mask.s_addr)) {
+            longest_match = r_table;
+            changed = 1;
         }
     }
-
-    return longest_match;
+    if (changed == 1) {
+      return longest_match;
+    }
+    return NULL;
 }
 
 
