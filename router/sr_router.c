@@ -117,18 +117,6 @@ void construct_eth_header(uint8_t *buf, uint8_t *dst, uint8_t *src, uint16_t typ
   reply_ehdr->ether_type = htons(type);
 }
 
-void construct_arp_header(uint8_t *buf, struct sr_if* source_if, sr_arp_hdr_t *arp_hdr, unsigned short type) {
-  sr_arp_hdr_t *reply_arp_hdr = (sr_arp_hdr_t *)buf;
-  memcpy(reply_arp_hdr, arp_hdr, sizeof(sr_arp_hdr_t));
-  reply_arp_hdr->ar_op = htons(type);
-  /* scource */
-  memcpy(reply_arp_hdr->ar_sha, source_if->addr, ETHER_ADDR_LEN);
-  reply_arp_hdr->ar_sip = source_if->ip;
-  /* destination*/
-  memcpy(reply_arp_hdr->ar_tha, arp_hdr->ar_sha, ETHER_ADDR_LEN);
-  reply_arp_hdr->ar_tip = arp_hdr->ar_sip;
-}
-
 void construct_ip_header(uint8_t *buf, uint32_t dst, uint32_t src, uint16_t type) {
   sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(buf);
   ip_hdr->ip_src = src;
@@ -334,10 +322,10 @@ void sr_handle_arp_packet(struct sr_instance *sr,
                           uint8_t *packet/* lent */,
                           unsigned int len,
                           char *interface/* lent */) {
-    sr_ethernet_hdr_t *ehdr = (sr_ethernet_hdr_t *)packet;
+    sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)packet;
     struct sr_if *source_if = sr_get_interface(sr, interface);
 
-    fprintf(stdout, "It's a ARP request!\n");
+    fprintf(stdout, "Handling ARP request!\n");
     sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(packet+sizeof(sr_ethernet_hdr_t));
     struct sr_if *target_if = get_interface_through_ip(sr, arp_hdr->ar_tip);
 
@@ -345,19 +333,21 @@ void sr_handle_arp_packet(struct sr_instance *sr,
      * In the case of an ARP request, you should only send an ARP reply if the target IP address is one of
      * your router's IP addresses */
     if (target_if && ntohs(arp_hdr->ar_op) == arp_op_request) {
-        fprintf(stdout, "---------case1.1: arp_request ----------\n");
+        fprintf(stdout, "---------case1.1: arp_request ghj ----------\n");
         /* construct ARP reply */
-        unsigned long reply_len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t);
-        uint8_t *arp_reply = (uint8_t *)malloc(reply_len);
+        unsigned long length = sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t);
+        uint8_t *arp_reply = (uint8_t *)malloc(length);
 
         /* construct ethernet header */
-        construct_eth_header(arp_reply, ehdr->ether_shost, source_if->addr, ethertype_arp);
+        build_ether_header((sr_ethernet_hdr_t *)arp_reply,
+                           eth_hdr->ether_shost, source_if->addr, ethertype_arp);
 
         /* construct arp header */
-        construct_arp_header(arp_reply + sizeof(sr_ethernet_hdr_t), source_if, arp_hdr, arp_op_reply);
+        build_arp_header((sr_arp_hdr_t *)(arp_reply + sizeof(sr_ethernet_hdr_t)),
+                         source_if, arp_hdr, arp_op_reply);
 
         fprintf(stdout, "sending ARP reply packet\n");
-        sr_send_packet(sr, arp_reply, reply_len, source_if->name);
+        sr_send_packet(sr, arp_reply, length, source_if->name);
         free(arp_reply);
     }
         /* case1.2: the ARP reply destinates to an router interface
@@ -365,12 +355,14 @@ void sr_handle_arp_packet(struct sr_instance *sr,
          * address is one of your router's IP addresses. */
     else if (target_if && ntohs(arp_hdr->ar_op) == arp_op_reply) {
         fprintf(stdout, "---------case1.2: arp_response ----------\n");
-        struct sr_arpreq *arpreq = sr_arpcache_insert(&(sr->cache), arp_hdr->ar_sha, ntohl(arp_hdr->ar_sip));
+        struct sr_arpreq *arpreq = sr_arpcache_insert(&(sr->cache),
+                                                      arp_hdr->ar_sha, ntohl(arp_hdr->ar_sip));
         if (arpreq) {
-            struct sr_packet *pkt;
-            for (pkt=arpreq->packets; pkt != NULL; pkt=pkt->next) {
-                construct_eth_header(pkt->buf, arp_hdr->ar_sha, source_if->addr, ethertype(pkt->buf));
-                sr_send_packet(sr, pkt->buf, pkt->len, pkt->iface);
+            struct sr_packet *packet_pointer;
+            for (packet_pointer=arpreq->packets; packet_pointer != NULL; packet_pointer=packet_pointer->next) {
+                build_ether_header((sr_ethernet_hdr_t *)packet_pointer->buf,
+                                   arp_hdr->ar_sha, source_if->addr, ethertype(packet_pointer->buf));
+                sr_send_packet(sr, packet_pointer->buf, packet_pointer->len, packet_pointer->iface);
             }
             sr_arpreq_destroy(&(sr->cache), arpreq);
         }
