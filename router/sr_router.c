@@ -147,16 +147,12 @@ uint8_t* construct_icmp_header(uint8_t *buf, struct sr_if* source_if, uint8_t ty
   return reply;
 }
 
-/* Get interface object by exact match */
-struct sr_if* get_interface_by_ip(struct sr_instance* sr, uint32_t tip) {
-  struct sr_if *if_walker = sr->if_list;
-  while (if_walker) {
-    if (if_walker->ip == tip) {
-      return if_walker;
+struct sr_if *get_interface_through_ip(struct sr_instance *sr, uint32_t dest_addr) {
+    struct sr_if *pos = sr->if_list;
+    for (; pos != NULL; pos = pos->next) {
+        if (dest_addr == pos->ip) return pos;
     }
-    if_walker = if_walker->next;
-  }
-  return 0;
+    return NULL;
 }
 
 int handle_chksum(sr_ip_hdr_t *ip_hdr) {
@@ -209,7 +205,7 @@ void sr_handle_ip_packet(struct sr_instance *sr,
     struct sr_if *source_if = sr_get_interface(sr, interface);
 
     sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(packet+sizeof(sr_ethernet_hdr_t));
-    struct sr_if *target_if = get_interface_by_ip(sr, ip_hdr->ip_dst);
+    struct sr_if *target_if = get_interface_through_ip(sr, ip_hdr->ip_dst);
     fprintf(stdout, "It's TTL is: %d\n", ip_hdr->ip_ttl);
 
     int success = handle_chksum(ip_hdr);
@@ -320,7 +316,7 @@ void sr_handle_arp_packet(struct sr_instance *sr,
 
     fprintf(stdout, "It's a ARP request!\n");
     sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(packet+sizeof(sr_ethernet_hdr_t));
-    struct sr_if *target_if = get_interface_by_ip(sr, arp_hdr->ar_tip);
+    struct sr_if *target_if = get_interface_through_ip(sr, arp_hdr->ar_tip);
 
     /* case1.1: the ARP request destinates to an router interface
      * In the case of an ARP request, you should only send an ARP reply if the target IP address is one of
