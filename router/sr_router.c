@@ -391,27 +391,45 @@ void send_ICMP_msg(struct sr_instance *sr,
     sr_ethernet_hdr_t *packet_eth = (sr_ethernet_hdr_t *)packet;
     sr_ip_hdr_t *packet_ip = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
     uint8_t *reply = NULL;
-    unsigned long new_len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
-    reply = (uint8_t *)malloc(new_len);
+    unsigned long new_len;
+    if (type == 3 || type == 11) {
+        new_len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
+        reply = (uint8_t *)malloc(new_len);
+    } else if (type == 0) {
+        new_len = len;
+        reply = packet;
+    }
+
 
     /* build ethernet header */
     build_ether_header((sr_ethernet_hdr_t *)reply, (uint8_t *)packet_eth->ether_shost, iface->addr, ethertype_ip);
 
-    /* build ip header */
     uint8_t *reply_ip_buf = reply + sizeof(sr_ethernet_hdr_t);
-    memcpy(reply_ip_buf, packet_ip, sizeof(sr_ip_hdr_t));
-    build_ip_header((sr_ip_hdr_t *) reply_ip_buf, htons(sizeof(sr_ip_hdr_t)+sizeof(sr_icmp_t3_hdr_t)),
-                    iface->ip, packet_ip->ip_src, ip_protocol_icmp);
 
-    /* build icmp t3 header */
     if (type == 3 || type == 11){
+        /* build ip header */
+        memcpy(reply_ip_buf, packet_ip, sizeof(sr_ip_hdr_t));
+        build_ip_header((sr_ip_hdr_t *) reply_ip_buf, htons(sizeof(sr_ip_hdr_t)+sizeof(sr_icmp_t3_hdr_t)),
+                        iface->ip, packet_ip->ip_src, ip_protocol_icmp);
+
+        /* build icmp t3 header */
         sr_icmp_t3_hdr_t *reply_icmp_t3_hdr = (sr_icmp_t3_hdr_t *) (reply_ip_buf + sizeof(sr_ip_hdr_t));
         build_icmp_type3_header(reply_icmp_t3_hdr, type, code, (uint8_t *) packet_ip);
+
     } else if (type == 0) {
+        /* build ip header */
+        build_ip_header((sr_ip_hdr_t *) reply_ip_buf, htons(sizeof(sr_ip_hdr_t)+sizeof(sr_icmp_t3_hdr_t)),
+                        packet_ip->ip_dst, packet_ip->ip_src, ip_protocol_icmp);
+
+        /* build icmp header */
         sr_icmp_hdr_t *reply_icmp_hdr = (sr_icmp_hdr_t *) (reply_ip_buf + sizeof(sr_ip_hdr_t));
-        build_icmp_header(reply_icmp_hdr, type, code);
+        build_icmp_header(reply_icmp_hdr, type, code, len - sizeof(sr_ethernet_hdr_t) - sizeof(sr_ip_hdr_t));
     }
 
-    sr_send_packet(sr, reply, new_len, iface->name);
-    free(reply);
+    if (type == 3 || type == 11){
+        sr_send_packet(sr, reply, new_len, iface->name);
+        free(reply);
+    } else if (type == 0) {
+
+    }
 }
