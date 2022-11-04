@@ -127,8 +127,8 @@ void construct_ip_header(uint8_t *buf, uint32_t dst, uint32_t src, uint16_t type
 }
 
 uint8_t* construct_icmp_header(uint8_t *buf, struct sr_if* source_if, uint8_t type, uint8_t code, unsigned long total_len) {
-  sr_ethernet_hdr_t *ehdr = (sr_ethernet_hdr_t *)buf;
-  sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(buf + sizeof(sr_ethernet_hdr_t));
+  sr_ethernet_hdr_t *packet_eth = (sr_ethernet_hdr_t *)buf;
+  sr_ip_hdr_t *packet_ip = (sr_ip_hdr_t *)(buf + sizeof(sr_ethernet_hdr_t));
   uint8_t *reply = NULL;
   
   if (type == 0) {
@@ -143,16 +143,12 @@ uint8_t* construct_icmp_header(uint8_t *buf, struct sr_if* source_if, uint8_t ty
     unsigned long new_len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
     reply = (uint8_t *)malloc(new_len);
     /* construct ethernet header */
-    construct_eth_header(reply, ehdr->ether_shost, source_if->addr, ethertype_ip);
+      build_ether_header((sr_ethernet_hdr_t *)reply, packet_eth->ether_shost, source_if->addr, ethertype_ip);;
     /* construct ip header */
-    uint8_t *reply_ip_buf = reply + sizeof(sr_ethernet_hdr_t);
-    memcpy(reply_ip_buf, ip_hdr, sizeof(sr_ip_hdr_t));
-    sr_ip_hdr_t *reply_ip = (sr_ip_hdr_t *) reply_ip_buf;
-    reply_ip->ip_len = htons(sizeof(sr_ip_hdr_t)+sizeof(sr_icmp_t3_hdr_t));
-    if (type == 11) {
-      reply_ip->ip_ttl = 100;
-    }
-    construct_ip_header(reply_ip_buf, ip_hdr->ip_src, source_if->ip, ip_protocol_icmp);
+      uint8_t *reply_ip_buf = reply + sizeof(sr_ethernet_hdr_t);
+      memcpy(reply_ip_buf, packet_ip, sizeof(sr_ip_hdr_t));
+      build_ip_header((sr_ip_hdr_t *) reply_ip_buf, htons(sizeof(sr_ip_hdr_t)+sizeof(sr_icmp_t3_hdr_t)),
+                      source_if->ip, packet_ip->ip_src, ip_protocol_icmp);
     /* construct icmp header */
     sr_icmp_t3_hdr_t *reply_icmp_hdr = (sr_icmp_t3_hdr_t *)(reply_ip_buf + sizeof(sr_ip_hdr_t));
     reply_icmp_hdr->icmp_type = type;
@@ -160,7 +156,7 @@ uint8_t* construct_icmp_header(uint8_t *buf, struct sr_if* source_if, uint8_t ty
     reply_icmp_hdr->icmp_sum = 0;
     reply_icmp_hdr->unused = 0;
     reply_icmp_hdr->next_mtu = 0;
-    memcpy(reply_icmp_hdr->data, ip_hdr, ICMP_DATA_SIZE);
+    memcpy(reply_icmp_hdr->data, packet_ip, ICMP_DATA_SIZE);
     reply_icmp_hdr->icmp_sum = cksum(reply_icmp_hdr, sizeof(sr_icmp_t3_hdr_t));
   }
   return reply;
