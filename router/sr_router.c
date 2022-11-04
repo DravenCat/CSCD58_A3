@@ -89,24 +89,19 @@ void sr_handlepacket(struct sr_instance* sr,
 
     /* fill in code here */
 
+    /* get the ethernet header */
+    uint16_t ethernet_type = ethertype(packet);
+
     /* sanity check */
-    int success = sanity_check(packet, len);
-    if (success != 0) {
+    if (pass_sanity_check(packet, len, ethernet_type)) {/* case1: is an arp request */
+        if (ethernet_type == ethertype_arp) {
+            sr_handle_arp_packet(sr, packet, len, interface);
+        } else if (ethernet_type == ethertype_ip) {
+            sr_handle_ip_packet(sr, packet, len, interface);
+        }
+    } else {
         fprintf(stderr, "Failed to handle packet\n");
         return;
-    }
-
-    /* get the ethernet header */
-    uint16_t ethtype = ethertype(packet);
-
-    /* case1: is an arp request */
-    if (ethtype == ethertype_arp) {
-        sr_handle_arp_packet(sr, packet, len, interface);
-    }
-
-        /* case2: is an ip request */
-    else if (ethtype == ethertype_ip) {
-        sr_handle_ip_packet(sr, packet, len, interface);
     }
 
 }/* end sr_ForwardPacket */
@@ -155,46 +150,58 @@ struct sr_if *get_interface_through_ip(struct sr_instance *sr, uint32_t dest_add
     return NULL;
 }
 
-int handle_chksum(sr_ip_hdr_t *ip_hdr) {
-  /* inspect checksum */
-  uint16_t sum = ip_hdr->ip_sum;
-  ip_hdr->ip_sum = 0;
-  ip_hdr->ip_sum = cksum(ip_hdr, sizeof(sr_ip_hdr_t));
-  if (sum != ip_hdr->ip_sum) {
-    fprintf(stderr, "Incorrect checksum\n");
-    return -1;
-  }
-  return 0;
-}
+/*
+ *  Sanity-check the packet
+ * */
+int pass_sanity_check(uint8_t *packet, unsigned int len, uint16_t ether_type) {
+    int base_length = sizeof(sr_ethernet_hdr_t);
 
-int sanity_check(uint8_t *buf, unsigned int length) {
-  int minlength = sizeof(sr_ethernet_hdr_t);
-  if (length < minlength) {
-    return -1;
-  }
-  uint16_t ethtype = ethertype(buf);
-  if (ethtype == ethertype_ip) { /* IP */
-    minlength += sizeof(sr_ip_hdr_t);
-    if (length < minlength) {
-      return -1;
-    }
+    if (ether_type == ethertype_ip) {/* IP */
+        base_length += sizeof(sr_ip_hdr_t);
+        uint8_t ip_proto = ip_protocol(packet + sizeof(sr_ethernet_hdr_t));
 
-    uint8_t ip_proto = ip_protocol(buf + sizeof(sr_ethernet_hdr_t));
-    if (ip_proto == ip_protocol_icmp) { /* ICMP */
-      minlength += sizeof(sr_icmp_hdr_t);
-      if (length < minlength)
-        return -1;
-    }
-  }
-  else if (ethtype == ethertype_arp) { /* ARP */
-    minlength += sizeof(sr_arp_hdr_t);
-    if (length < minlength)
-      return -1;
-  }
-  else {
-    return -1;
-  }
-  return 0;
+        /* check min length */
+        if (base_length > len) {
+            fprintf(stderr, "Not a valid IP header\n");
+            return 0;
+        }
+
+        /* has correct checksum */
+        sr_ip_hdr_t *ip_header = (sr_ip_hdr_t *) (packet + sizeof(sr_ethernet_hdr_t));
+        uint16_t org_sum = ip_header->ip_sum;
+        ip_header->ip_sum = 0;
+        ip_header->ip_sum = cksum(ip_header, sizeof(sr_ip_hdr_t));
+        if (org_sum != ip_header->ip_sum) {
+            fprintf(stderr, "Wrong checksum for IP header\n");
+            return 0;
+        }
+
+        if (ip_proto != ip_protocol_icmp) { /* ICMP */
+            /* check min length */
+            base_length += sizeof(sr_icmp_hdr_t);
+            if (base_length > len) {
+                fprintf(stderr, "Not a valid ICMP header\n");
+                return 0;
+            }
+
+            /* has correct checksum */
+            sr_icmp_hdr_t *icmp_header = (sr_icmp_hdr_t *) (packet + sizeof(sr_ip_hdr_t) + sizeof(sr_ethernet_hdr_t));
+            org_sum = icmp_header->icmp_sum;
+            icmp_header->icmp_sum = 0;
+            icmp_header->icmp_sum = cksum(icmp_header, sizeof(sr_icmp_hdr_t));
+            if (org_sum != icmp_header->icmp_sum) {
+                fprintf(stderr, "Wrong checksum for ICMP header\n");
+                return 0;
+            }
+        }
+
+    } else if (ether_type == ethertype_arp) { /* ARP */
+        /*check min length */
+        base_length += sizeof(sr_arp_hdr_t);
+        if (base_length > len) return 0;
+    } else return 0;
+
+    return 1;
 }
 
 void sr_handle_ip_packet(struct sr_instance *sr,
@@ -208,11 +215,6 @@ void sr_handle_ip_packet(struct sr_instance *sr,
     struct sr_if *target_if = get_interface_through_ip(sr, ip_hdr->ip_dst);
     fprintf(stdout, "It's TTL is: %d\n", ip_hdr->ip_ttl);
 
-    int success = handle_chksum(ip_hdr);
-    if (success == -1) {
-        fprintf(stderr, "IP header chsum failed!\n");
-        return;
-    }
     /* If it is sent to one of your router's IP addresses, */
     /* case2.1: the request destinates to an router interface */
     if (target_if) {
@@ -230,13 +232,6 @@ void sr_handle_ip_packet(struct sr_instance *sr,
             sr_icmp_hdr_t *icmp_hdr = (sr_icmp_hdr_t *)(packet+sizeof(sr_ethernet_hdr_t)+sizeof(sr_ip_hdr_t));
             if (icmp_hdr->icmp_type == (uint8_t)8) {
                 fprintf(stderr, "sending an ICMP echo response\n");
-                uint16_t sum = icmp_hdr->icmp_sum;
-                icmp_hdr->icmp_sum = 0;
-                icmp_hdr->icmp_sum = cksum(icmp_hdr, len-sizeof(sr_ethernet_hdr_t)-sizeof(sr_ip_hdr_t));
-                if (sum != icmp_hdr->icmp_sum) {
-                    fprintf(stderr, "Incorrect checksum\n");
-                    return;
-                }
 
                 /* construct icmp echo response */
                 construct_icmp_header(packet, source_if, 0, 0, len);

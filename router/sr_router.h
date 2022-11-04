@@ -68,9 +68,8 @@ int sr_read_from_server(struct sr_instance* );
 void sr_init(struct sr_instance* );
 void sr_handlepacket(struct sr_instance* , uint8_t * , unsigned int , char* );
 
-int sanity_check(uint8_t *buf, unsigned int length);
-int handle_chksum(sr_ip_hdr_t *ip_hdr);
 uint8_t* construct_icmp_header(uint8_t *ip_buf, struct sr_if* source_if, uint8_t type, uint8_t code, unsigned long total_len);
+int pass_sanity_check(uint8_t *packet, unsigned int len, uint16_t ether_type);
 void sr_handle_ip_packet(struct sr_instance *sr,
                          uint8_t *packet/* lent */,
                          unsigned int len,
