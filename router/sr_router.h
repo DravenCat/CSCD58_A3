@@ -70,8 +70,6 @@ void sr_handlepacket(struct sr_instance* , uint8_t * , unsigned int , char* );
 
 int sanity_check(uint8_t *buf, unsigned int length);
 int handle_chksum(sr_ip_hdr_t *ip_hdr);
-void construct_eth_header(uint8_t *buf, uint8_t *dst, uint8_t *src, uint16_t type);
-void construct_ip_header(uint8_t *buf, uint32_t dst, uint32_t src, uint16_t type);
 uint8_t* construct_icmp_header(uint8_t *ip_buf, struct sr_if* source_if, uint8_t type, uint8_t code, unsigned long total_len);
 
 void sr_handle_ip_packet(struct sr_instance *sr,

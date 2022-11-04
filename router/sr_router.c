@@ -110,22 +110,6 @@ void sr_handlepacket(struct sr_instance* sr,
 
 }/* end sr_ForwardPacket */
 
-void construct_eth_header(uint8_t *buf, uint8_t *dst, uint8_t *src, uint16_t type) {
-  sr_ethernet_hdr_t *reply_ehdr = (sr_ethernet_hdr_t *)buf;
-  memcpy(reply_ehdr->ether_dhost, dst, ETHER_ADDR_LEN);
-  memcpy(reply_ehdr->ether_shost, src, ETHER_ADDR_LEN);
-  reply_ehdr->ether_type = htons(type);
-}
-
-void construct_ip_header(uint8_t *buf, uint32_t dst, uint32_t src, uint16_t type) {
-  sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(buf);
-  ip_hdr->ip_src = src;
-  ip_hdr->ip_dst = dst;
-  ip_hdr->ip_p = type;
-  ip_hdr->ip_sum = 0;
-  ip_hdr->ip_sum = cksum(ip_hdr, sizeof(sr_ip_hdr_t));
-}
-
 uint8_t* construct_icmp_header(uint8_t *buf, struct sr_if* source_if, uint8_t type, uint8_t code, unsigned long total_len) {
   sr_ethernet_hdr_t *packet_eth = (sr_ethernet_hdr_t *)buf;
   sr_ip_hdr_t *packet_ip = (sr_ip_hdr_t *)(buf + sizeof(sr_ethernet_hdr_t));
