@@ -188,7 +188,7 @@ void sr_handle_ip_packet(struct sr_instance *sr,
                          unsigned int len,
                          char *interface/* lent */) {
     sr_ethernet_hdr_t *packet_eth = (sr_ethernet_hdr_t *)packet;
-    struct sr_if *source_if = sr_get_interface(sr, interface);
+    struct sr_if *iface = sr_get_interface(sr, interface);
 
     sr_ip_hdr_t *packet_ip = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
     struct sr_if *target_if = get_interface_through_ip(sr, packet_ip->ip_dst);
@@ -205,7 +205,7 @@ void sr_handle_ip_packet(struct sr_instance *sr,
         if (protocol == ip_protocol_icmp) {
             fprintf(stderr, "---------case2.1.1: icmp ----------\n");
             /* construct ethernet header */
-            build_ether_header((sr_ethernet_hdr_t *)packet, packet_eth->ether_shost, source_if->addr, ethertype_ip);
+            build_ether_header((sr_ethernet_hdr_t *)packet, packet_eth->ether_shost, iface->addr, ethertype_ip);
             /* construct ip header */
             build_ip_header(packet_ip, packet_ip->ip_len,
                             packet_ip->ip_dst, packet_ip->ip_src, ip_protocol_icmp);
@@ -226,7 +226,7 @@ void sr_handle_ip_packet(struct sr_instance *sr,
                 icmp_hdr->icmp_sum = 0;
                 icmp_hdr->icmp_sum = cksum(icmp_hdr, len - sizeof(sr_ethernet_hdr_t) - sizeof(sr_ip_hdr_t));
                 fprintf(stdout, "sending ICMP (type:0, code:0)\n");
-                sr_send_packet(sr, packet, len, source_if->name);
+                sr_send_packet(sr, packet, len, iface->name);
             }
         }
             /* If the packet contains a TCP or UDP payload, send an
@@ -234,12 +234,7 @@ void sr_handle_ip_packet(struct sr_instance *sr,
         else if (protocol == ip_protocol_tcp || protocol == ip_protocol_udp) {
             fprintf(stderr, "---------case2.1.2: tcp/udp ----------\n");
             /* construct icmp echo response */
-            uint8_t *reply = construct_icmp_header(packet, source_if, 3, 3, len);
-            unsigned long new_len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
-
-            fprintf(stdout, "sending ICMP (Type 3, Code 3) unreachable\n");
-            sr_send_packet(sr, reply, new_len, source_if->name);
-            free(reply);
+            send_ICMP_msg(sr, packet, len, interface, 3, 3, iface);
         }
     }
         /* case2.2: the request does not destinate to an router interface */
@@ -253,10 +248,10 @@ void sr_handle_ip_packet(struct sr_instance *sr,
         /* Sent ICMP type 11 code 0, if an IP packet is discarded during processing because the TTL field is 0 */
         if (packet_ip->ip_ttl < 0) {
             /* construct icmp echo response */
-            uint8_t *reply = construct_icmp_header(packet, source_if, 11, 0, len);
+            uint8_t *reply = construct_icmp_header(packet, iface, 11, 0, len);
             unsigned long new_len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
             fprintf(stdout, "sending ICMP (Type 11, Code 0) unreachable\n");
-            sr_send_packet(sr, reply, new_len, source_if->name);
+            sr_send_packet(sr, reply, new_len, iface->name);
             free(reply);
             return;
         }
@@ -267,10 +262,10 @@ void sr_handle_ip_packet(struct sr_instance *sr,
         if (oif_name == NULL) {
 
             /* construct icmp echo response */
-            uint8_t *reply = construct_icmp_header(packet, source_if, 3, 0, len);
+            uint8_t *reply = construct_icmp_header(packet, iface, 3, 0, len);
             unsigned long new_len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
             fprintf(stdout, "sending ICMP (Type 3, Code 0) unreachable\n");
-            sr_send_packet(sr, reply, new_len, source_if->name);
+            sr_send_packet(sr, reply, new_len, iface->name);
             free(reply);
             return;
         }
@@ -419,5 +414,24 @@ void send_ICMP_msg(struct sr_instance *sr,
                    unsigned int len,
                    char *interface,
                    uint8_t type, uint8_t code, struct sr_if *iface) {
+    sr_ethernet_hdr_t *packet_eth = (sr_ethernet_hdr_t *)packet;
+    sr_ip_hdr_t *packet_ip = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
+    uint8_t *reply = NULL;
+    unsigned long new_len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
+    reply = (uint8_t *)malloc(new_len);
+    /* construct ethernet header */
+    build_ether_header((sr_ethernet_hdr_t *)reply, packet_eth->ether_shost, iface->addr, ethertype_ip);;
+    /* construct ip header */
+    uint8_t *reply_ip_buf = reply + sizeof(sr_ethernet_hdr_t);
+    memcpy(reply_ip_buf, packet_ip, sizeof(sr_ip_hdr_t));
+    build_ip_header((sr_ip_hdr_t *) reply_ip_buf, htons(sizeof(sr_ip_hdr_t)+sizeof(sr_icmp_t3_hdr_t)),
+                    iface->ip, packet_ip->ip_src, ip_protocol_icmp);
+    /* construct icmp header */
+    sr_icmp_t3_hdr_t *reply_icmp_hdr = (sr_icmp_t3_hdr_t *)(reply_ip_buf + sizeof(sr_ip_hdr_t));
+    memcpy(reply_icmp_hdr->data, packet_ip, ICMP_DATA_SIZE);
+    build_icmp_header(reply_icmp_hdr, type, code, sizeof(sr_icmp_t3_hdr_t));
 
+    fprintf(stdout, "sending ICMP (Type 3, Code 3) unreachable\n");
+    sr_send_packet(sr, reply, new_len, iface->name);
+    free(reply);
 }
