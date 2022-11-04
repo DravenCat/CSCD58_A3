@@ -25,6 +25,7 @@ void sr_arpcache_sweepreqs(struct sr_instance *sr) {
     }
 }
 
+/* Sent if five ARP requests were sent to the next-hop IP without a response */
 void sr_send_icmp(struct sr_instance *sr, struct sr_packet *packet) {
     sr_ip_hdr_t *packet_ip = (sr_ip_hdr_t *)((packet->buf + sizeof(sr_ethernet_hdr_t)));
     char *interface = find_longest_prefix_name(sr, packet_ip->ip_src);
@@ -36,43 +37,45 @@ void sr_send_icmp(struct sr_instance *sr, struct sr_packet *packet) {
     fprintf(stdout, "Destination host unreachable (type 3, code 1) \n");
 }
 
+/*An ARP request should be sent to a target IP address about once every second until a reply comes in*/
 void sr_send_arpreq(struct sr_instance *sr, struct sr_arpreq *request) {
-    /* send arp request */
     unsigned long arpreq_len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t);
     uint8_t *arpreq = (uint8_t *)malloc(arpreq_len);
-    char *interface_name = request->packets->iface;
-    struct sr_if *if_1 = sr_get_interface(sr, interface_name);
+    char *interface = request->packets->iface;
+    struct sr_if *iface = sr_get_interface(sr, interface);
 
-    /*set the ethernet header*/
-    sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)arpreq;
+    /* ARP requests are sent to the broadcast MAC address*/
+    sr_ethernet_hdr_t *arpreq_eth = (sr_ethernet_hdr_t *)arpreq;
     uint8_t dhost[ETHER_ADDR_LEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-    memcpy(eth_hdr->ether_dhost, dhost, ETHER_ADDR_LEN);
-    memcpy(eth_hdr->ether_shost, if_1->addr, ETHER_ADDR_LEN);
-    eth_hdr->ether_type = htons(ethertype_arp);
+    memcpy(arpreq_eth->ether_dhost, dhost, ETHER_ADDR_LEN);
+    memcpy(arpreq_eth->ether_shost, iface->addr, ETHER_ADDR_LEN);
+    arpreq_eth->ether_type = htons(ethertype_arp);
 
-    /*set the arp header*/
+    /* Set the arp header and initialize target MAC address*/
     sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(arpreq + sizeof(sr_ethernet_hdr_t));
     arp_hdr->ar_hrd = htons(arp_hrd_ethernet);
     arp_hdr->ar_pro = htons(ethertype_ip);
     arp_hdr->ar_hln = ETHER_ADDR_LEN;
     arp_hdr->ar_pln = 4;
     arp_hdr->ar_op = htons(arp_op_request);
-    arp_hdr->ar_sip = if_1->ip;
+    arp_hdr->ar_sip = iface->ip;
     arp_hdr->ar_tip = htonl(request->ip);
-    memcpy(arp_hdr->ar_sha, if_1->addr, ETHER_ADDR_LEN);
-    uint8_t zeros[ETHER_ADDR_LEN] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-    memcpy(arp_hdr->ar_tha, zeros, ETHER_ADDR_LEN);
+    memcpy(arp_hdr->ar_sha, iface->addr, ETHER_ADDR_LEN);
+    uint8_t init_MAC[ETHER_ADDR_LEN] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+    memcpy(arp_hdr->ar_tha, init_MAC, ETHER_ADDR_LEN);
 
-    sr_send_packet(sr, arpreq, arpreq_len, interface_name);
+    sr_send_packet(sr, arpreq, arpreq_len, interface);
     free(arpreq);
 }
 
+/* Handle each arp request */
 void sr_handle_arprequest(struct sr_instance *sr, struct sr_arpreq *request) {
     time_t now = time(NULL);
     if (difftime(now, request->sent) > 1.0) {
+        /* If an ARP request has been sent 5 times with no response,
+         * a destination host unreachable should go back to all the sender of
+         * packets that were waiting on a reply to this ARP request.  */
         if (request->times_sent >= 5) {
-            /* send icmp host unreachable to source addr of all pkts waiting
-               on this request  */
             struct sr_packet *packet;
             for (packet=request->packets; packet != NULL; packet=packet->next) {
                 sr_send_icmp(sr, packet);
