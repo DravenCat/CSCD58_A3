@@ -364,11 +364,11 @@ void build_icmp_type3_header(sr_icmp_t3_hdr_t *icmp_msg_icmp, uint8_t type, uint
 }
 
 /* Build the icmp header */
-void build_icmp_header(sr_icmp_hdr_t *icmp_msg_icmp, uint8_t type, uint8_t code) {
+void build_icmp_header(sr_icmp_hdr_t *icmp_msg_icmp, uint8_t type, uint8_t code, int len) {
     icmp_msg_icmp->icmp_type = type;
     icmp_msg_icmp->icmp_code = code;
     icmp_msg_icmp->icmp_sum = 0;
-    icmp_msg_icmp->icmp_sum = cksum(icmp_msg_icmp, sizeof(sr_icmp_hdr_t));
+    icmp_msg_icmp->icmp_sum = cksum(icmp_msg_icmp, len);
 }
 
 /* Build the arp header */
