@@ -176,12 +176,6 @@ void sr_handle_ip_packet(struct sr_instance *sr,
         /*   If the packet is an ICMP echo request and its checksum is valid, send an ICMP echo reply to the sending host. */
         if (protocol == ip_protocol_icmp) {
 
-            /* build the ethernet header */
-            build_ether_header((sr_ethernet_hdr_t *)packet, (uint8_t *)packet_eth->ether_shost, iface->addr, ethertype_ip);
-            /* build the ip header */
-            build_ip_header(packet_ip, packet_ip->ip_len,
-                            packet_ip->ip_dst, packet_ip->ip_src, ip_protocol_icmp);
-
             sr_icmp_hdr_t *icmp_hdr = (sr_icmp_hdr_t *)(packet+sizeof(sr_ethernet_hdr_t)+sizeof(sr_ip_hdr_t));
             if (icmp_hdr->icmp_type == (uint8_t)8) { /* check whether it is an echo request */
                 /* check the checksum */
@@ -193,13 +187,7 @@ void sr_handle_ip_packet(struct sr_instance *sr,
                     return;
                 }
 
-                /* build icmp echo response */
-                icmp_hdr->icmp_type = 0;
-                icmp_hdr->icmp_code = 0;
-                icmp_hdr->icmp_sum = 0;
-                icmp_hdr->icmp_sum = cksum(icmp_hdr, len - sizeof(sr_ethernet_hdr_t) - sizeof(sr_ip_hdr_t));
-                fprintf(stdout, "Echo reply (type 0)\n");
-                sr_send_packet(sr, packet, len, iface->name);
+                send_ICMP_msg(sr, packet, len, interface, 0, 0, iface);
             }
 
         /* If the packet contains a TCP or UDP payload, send an ICMP port unreachable to the sending host.*/
@@ -388,6 +376,7 @@ void send_ICMP_msg(struct sr_instance *sr,
                    unsigned int len,
                    char *interface,
                    uint8_t type, uint8_t code, struct sr_if *iface) {
+
     sr_ethernet_hdr_t *packet_eth = (sr_ethernet_hdr_t *)packet;
     sr_ip_hdr_t *packet_ip = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
     uint8_t *reply = NULL;
@@ -416,20 +405,19 @@ void send_ICMP_msg(struct sr_instance *sr,
         sr_icmp_t3_hdr_t *reply_icmp_t3_hdr = (sr_icmp_t3_hdr_t *) (reply_ip_buf + sizeof(sr_ip_hdr_t));
         build_icmp_type3_header(reply_icmp_t3_hdr, type, code, (uint8_t *) packet_ip);
 
+        /* send icmp packet*/
+        sr_send_packet(sr, reply, new_len, iface->name);
+        free(reply);
     } else if (type == 0) {
         /* build ip header */
-        build_ip_header((sr_ip_hdr_t *) reply_ip_buf, htons(sizeof(sr_ip_hdr_t)+sizeof(sr_icmp_t3_hdr_t)),
+        build_ip_header((sr_ip_hdr_t *) reply_ip_buf, packet_ip->ip_len,
                         packet_ip->ip_dst, packet_ip->ip_src, ip_protocol_icmp);
 
         /* build icmp header */
         sr_icmp_hdr_t *reply_icmp_hdr = (sr_icmp_hdr_t *) (reply_ip_buf + sizeof(sr_ip_hdr_t));
         build_icmp_header(reply_icmp_hdr, type, code, len - sizeof(sr_ethernet_hdr_t) - sizeof(sr_ip_hdr_t));
-    }
 
-    if (type == 3 || type == 11){
+        /* send icmp packet*/
         sr_send_packet(sr, reply, new_len, iface->name);
-        free(reply);
-    } else if (type == 0) {
-
     }
 }
