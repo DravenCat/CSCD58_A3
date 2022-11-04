@@ -60,7 +60,7 @@
 
    Since handle_arpreq as defined in the comments above could destroy your
    current request, make sure to save the next pointer before calling
-   handle_arpreq when traversing through the ARP requests linked list.
+   sr_handle_arprequest when traversing through the ARP requests linked list.
  */
 
 #ifndef SR_ARPCACHE_H
@@ -146,8 +146,8 @@ void sr_arpcache_dump(struct sr_arpcache *cache);
 int   sr_arpcache_init(struct sr_arpcache *cache);
 int   sr_arpcache_destroy(struct sr_arpcache *cache);
 void *sr_arpcache_timeout(void *cache_ptr);
-
-
-void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *request);
-
+void sr_handle_arprequest(struct sr_instance *sr, struct sr_arpreq *request);
+uint8_t* construct_icmp_header(uint8_t *buf, struct sr_if* source_if, uint8_t type, uint8_t code, unsigned long total_len);
+void sr_send_icmp(struct sr_instance *sr, struct sr_packet *packet);
+void sr_send_arpreq(struct sr_instance *sr, struct sr_arpreq *request);
 #endif

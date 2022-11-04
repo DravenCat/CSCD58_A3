@@ -67,30 +67,30 @@ int sr_read_from_server(struct sr_instance* );
 /* -- sr_router.c -- */
 void sr_init(struct sr_instance* );
 void sr_handlepacket(struct sr_instance* , uint8_t * , unsigned int , char* );
-int pass_sanity_check(uint8_t *packet, unsigned int len, uint16_t ether_type, uint8_t is_icmp);
 
+uint8_t* construct_icmp_header(uint8_t *ip_buf, struct sr_if* source_if, uint8_t type, uint8_t code, unsigned long total_len);
+int pass_sanity_check(uint8_t *packet, unsigned int len, uint16_t ether_type);
 void sr_handle_ip_packet(struct sr_instance *sr,
-                                uint8_t *packet/* lent */,
-                                unsigned int len,
-                                char *interface/* lent */);
+                         uint8_t *packet/* lent */,
+                         unsigned int len,
+                         char *interface/* lent */);
 
 void sr_handle_arp_packet(struct sr_instance *sr,
-                                 uint8_t *packet/* lent */,
-                                 unsigned int len,
-                                 char *interface/* lent */);
-
+                          uint8_t *packet/* lent */,
+                          unsigned int len,
+                          char *interface/* lent */);
 struct sr_if *get_interface_through_ip(struct sr_instance *sr, uint32_t dest_addr);
-void send_ICMP_msg(struct sr_instance *sr,
-                   uint8_t *packet,
-                   unsigned int len,
-                   char *interface,
-                   uint8_t type, uint8_t code);
 struct sr_rt *find_longest_prefix_match(struct sr_instance *sr, uint32_t dest_addr);
 char *find_longest_prefix_name(struct sr_instance *sr, uint32_t dest_addr);
 void build_ether_header(sr_ethernet_hdr_t *icmp_msg_eth, uint8_t *dhost, uint8_t *shost, uint16_t type);
 void build_ip_header(sr_ip_hdr_t *icmp_msg_ip, uint16_t ip_len, const uint8_t *src, const uint8_t *dst, uint8_t ip_p);
 void build_icmp_header(sr_icmp_t3_hdr_t *icmp_msg_icmp, uint8_t type, uint8_t code, int len);
-void build_arp_header(sr_arp_hdr_t *reply_arp_hdr, struct sr_if* source_if, sr_arp_hdr_t *arp_hdr, unsigned short type);
+void build_arp_header(sr_arp_hdr_t *arp_header, struct sr_if* interface, sr_arp_hdr_t *arp_hdr, unsigned short type);
+void send_ICMP_msg(struct sr_instance *sr,
+                   uint8_t *packet,
+                   unsigned int len,
+                   char *interface,
+                   uint8_t type, uint8_t code, struct sr_if *iface);
 
 /* -- sr_if.c -- */
 void sr_add_interface(struct sr_instance* , const char* );
