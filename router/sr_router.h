@@ -78,6 +78,11 @@ char *find_longest_prefix_name(struct sr_instance *sr, uint32_t dest_addr);
 void build_ether_header(sr_ethernet_hdr_t *icmp_msg_eth, uint8_t *dhost, uint8_t *shost, uint16_t type);
 void build_ip_header(sr_ip_hdr_t *icmp_msg_ip, uint16_t ip_len, const uint8_t *src, const uint8_t *dst, uint8_t ip_p);
 void build_icmp_header(sr_icmp_t3_hdr_t *icmp_msg_icmp, uint8_t type, uint8_t code, int len);
+void send_ICMP_msg(struct sr_instance *sr,
+                   uint8_t *packet,
+                   unsigned int len,
+                   char *interface,
+                   uint8_t type, uint8_t code, struct sr_if *iface);
 
 /* -- sr_if.c -- */
 void sr_add_interface(struct sr_instance* , const char* );
