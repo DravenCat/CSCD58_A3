@@ -152,37 +152,6 @@ int pass_sanity_check(uint8_t *packet, unsigned int len) {
     return 1;
 }
 
-uint8_t* construct_icmp_header(uint8_t *buf, struct sr_if* source_if, uint8_t type, uint8_t code, unsigned long len) {
-  sr_ethernet_hdr_t *packet_eth = (sr_ethernet_hdr_t *)buf;
-  sr_ip_hdr_t *packet_ip = (sr_ip_hdr_t *)(buf + sizeof(sr_ethernet_hdr_t));
-  uint8_t *reply = NULL;
-  
-  if (type == 0) {
-    sr_icmp_hdr_t *reply_icmp_hdr = (sr_icmp_hdr_t *)(buf + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
-    reply_icmp_hdr->icmp_type = type;
-    reply_icmp_hdr->icmp_code = code;
-    reply_icmp_hdr->icmp_sum = 0;
-    reply_icmp_hdr->icmp_sum = cksum(reply_icmp_hdr, len - sizeof(sr_ethernet_hdr_t) - sizeof(sr_ip_hdr_t));
-    reply = buf;
-  }
-  else if (type == 3 || type == 11) {
-    unsigned long new_len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
-    reply = (uint8_t *)malloc(new_len);
-    /* construct ethernet header */
-      build_ether_header((sr_ethernet_hdr_t *)reply, packet_eth->ether_shost, source_if->addr, ethertype_ip);;
-    /* construct ip header */
-      uint8_t *reply_ip_buf = reply + sizeof(sr_ethernet_hdr_t);
-      memcpy(reply_ip_buf, packet_ip, sizeof(sr_ip_hdr_t));
-      build_ip_header((sr_ip_hdr_t *) reply_ip_buf, htons(sizeof(sr_ip_hdr_t)+sizeof(sr_icmp_t3_hdr_t)),
-                      source_if->ip, packet_ip->ip_src, ip_protocol_icmp);
-    /* construct icmp header */
-      sr_icmp_t3_hdr_t *reply_icmp_hdr = (sr_icmp_t3_hdr_t *)(reply_ip_buf + sizeof(sr_ip_hdr_t));
-      memcpy(reply_icmp_hdr->data, packet_ip, ICMP_DATA_SIZE);
-      build_icmp_header(reply_icmp_hdr, type, code, sizeof(sr_icmp_t3_hdr_t));
-  }
-  return reply;
-}
-
 void sr_handle_ip_packet(struct sr_instance *sr,
                          uint8_t *packet/* lent */,
                          unsigned int len,
@@ -264,14 +233,14 @@ void sr_handle_ip_packet(struct sr_instance *sr,
             fprintf(stdout, "sending ICMP (Type 3, Code 0) unreachable\n");
             return;
         }
-        struct sr_if *oif = sr_get_interface(sr, iface_name);
+        struct sr_if *itface = sr_get_interface(sr, iface_name);
 
         /* send packet to next_hop_ip */
         struct sr_arpentry *entry = sr_arpcache_lookup(&(sr->cache), ntohl(packet_ip->ip_dst));
         if (entry) {
             /* use next_hop_ip->mac mapping in entry to send the packet*/
             memcpy(packet_eth->ether_dhost, entry->mac, ETHER_ADDR_LEN);
-            memcpy(packet_eth->ether_shost, oif->addr, ETHER_ADDR_LEN);
+            memcpy(packet_eth->ether_shost, itface->addr, ETHER_ADDR_LEN);
             sr_send_packet(sr, packet, len, iface_name);
             free(entry);
         }
