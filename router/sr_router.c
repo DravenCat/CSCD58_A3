@@ -407,7 +407,7 @@ void send_ICMP_msg(struct sr_instance *sr,
         build_icmp_type3_header(reply_icmp_t3_hdr, type, code, (uint8_t *) packet_ip);
 
         /* send icmp packet*/
-        sr_send_packet(sr, reply, new_len, iface->name);
+        sr_send_packet(sr, reply, new_len, interface);
         free(reply);
     } else if (type == 0) {
         /* build ip header */
@@ -419,6 +419,6 @@ void send_ICMP_msg(struct sr_instance *sr,
         build_icmp_header(reply_icmp_hdr, type, code, len - sizeof(sr_ethernet_hdr_t) - sizeof(sr_ip_hdr_t));
 
         /* send icmp packet*/
-        sr_send_packet(sr, reply, new_len, iface->name);
+        sr_send_packet(sr, reply, new_len, interface);
     }
 }
