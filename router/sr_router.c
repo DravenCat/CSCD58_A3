@@ -89,24 +89,19 @@ void sr_handlepacket(struct sr_instance* sr,
   print_hdrs(packet, len);
 
   /* fill in code here */
-
-  /* sanity check */
-  int success = pass_sanity_check(packet, len);
-  if (success == 0) {
-    fprintf(stderr, "Failed to handle packet\n");
-    return;
-  }
-
-    /* get the ethernet header */
-    uint16_t ethtype = ethertype(packet);
-
-    /* case1: is an arp request */
-  if (ethtype == ethertype_arp) {
-      sr_handle_arp_packet(sr, packet, len, interface);
-  } /* case2: is an ip request */
-  else if (ethtype == ethertype_ip) {
-      sr_handle_ip_packet(sr, packet, len, interface);
-  }
+    if (pass_sanity_check(packet, len)) {    /* case1: is an arp request */
+        /* get the ethernet header */
+        uint16_t ethtype = ethertype(packet);
+        if (ethtype == ethertype_arp) {
+            sr_handle_arp_packet(sr, packet, len, interface);
+        } /* case2: is an ip request */
+        else if (ethtype == ethertype_ip) {
+            sr_handle_ip_packet(sr, packet, len, interface);
+        }
+    } else {
+        fprintf(stderr, "Failed to handle packet\n");
+        return;
+    }
 
 }/* end sr_ForwardPacket */
 
