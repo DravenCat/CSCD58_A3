@@ -426,7 +426,7 @@ void build_ether_header(sr_ethernet_hdr_t *icmp_msg_eth, uint8_t *dhost, uint8_t
     icmp_msg_eth->ether_type = htons(type);
 }
 
-void build_ip_header(sr_ip_hdr_t *icmp_msg_ip, uint16_t ip_len, uint8_t *src, uint8_t *dst, uint8_t ip_p) {
+void build_ip_header(sr_ip_hdr_t *icmp_msg_ip, uint16_t ip_len, uint32_t src, uint32_t dst, uint8_t ip_p) {
     icmp_msg_ip->ip_len = ip_len;
     icmp_msg_ip->ip_src = src;
     icmp_msg_ip->ip_dst = dst;
