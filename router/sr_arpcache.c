@@ -39,33 +39,40 @@ void sr_send_icmp(struct sr_instance *sr, struct sr_packet *packet) {
 
 /*An ARP request should be sent to a target IP address about once every second until a reply comes in*/
 void sr_send_arpreq(struct sr_instance *sr, struct sr_arpreq *request) {
-    unsigned long arpreq_len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t);
-    uint8_t *arpreq = (uint8_t *)malloc(arpreq_len);
-    char *interface = request->packets->iface;
-    struct sr_if *iface = sr_get_interface(sr, interface);
+    unsigned long arpPackLen = sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t);
+    uint8_t *arpPack = (uint8_t *)malloc(arpPackLen);
+    struct sr_if *target_if = sr_get_interface(sr, request->packets->iface);
 
     /* ARP requests are sent to the broadcast MAC address*/
-    sr_ethernet_hdr_t *arpreq_eth = (sr_ethernet_hdr_t *)arpreq;
-    uint8_t dhost[ETHER_ADDR_LEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+    sr_ethernet_hdr_t *arpreq_eth = (sr_ethernet_hdr_t *)arpPack;
+    /*{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};*/
+    uint8_t *dhost = malloc(sizeof(uint8_t) * ETHER_ADDR_LEN);
+    int i = 0;
+    for (i = 0; i < ETHER_ADDR_LEN; i++) {
+        dhost[i] = 255;
+    }
     memcpy(arpreq_eth->ether_dhost, dhost, ETHER_ADDR_LEN);
-    memcpy(arpreq_eth->ether_shost, iface->addr, ETHER_ADDR_LEN);
+    memcpy(arpreq_eth->ether_shost, target_if->addr, ETHER_ADDR_LEN);
     arpreq_eth->ether_type = htons(ethertype_arp);
 
     /* Set the arp header and initialize target MAC address*/
-    sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(arpreq + sizeof(sr_ethernet_hdr_t));
+    sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(arpPack + sizeof(sr_ethernet_hdr_t));
     arp_hdr->ar_hrd = htons(arp_hrd_ethernet);
     arp_hdr->ar_pro = htons(ethertype_ip);
     arp_hdr->ar_hln = ETHER_ADDR_LEN;
     arp_hdr->ar_pln = 4;
     arp_hdr->ar_op = htons(arp_op_request);
-    arp_hdr->ar_sip = iface->ip;
-    arp_hdr->ar_tip = htonl(request->ip);
-    memcpy(arp_hdr->ar_sha, iface->addr, ETHER_ADDR_LEN);
-    uint8_t init_MAC[ETHER_ADDR_LEN] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+    memcpy(arp_hdr->ar_sha, target_if->addr, ETHER_ADDR_LEN);
+    arp_hdr->ar_sip = target_if->ip;
+    uint8_t *init_MAC = malloc(sizeof(uint8_t) * ETHER_ADDR_LEN);
+    for (i = 0; i < ETHER_ADDR_LEN; i++) {
+        dhost[i] = 0;
+    }
     memcpy(arp_hdr->ar_tha, init_MAC, ETHER_ADDR_LEN);
+    arp_hdr->ar_tip = htonl(request->ip);
 
-    sr_send_packet(sr, arpreq, arpreq_len, interface);
-    free(arpreq);
+    sr_send_packet(sr, arpPack, arpPackLen, request->packets->iface);
+    free(arpPack);
 }
 
 /* Handle each arp request */
@@ -76,14 +83,15 @@ void sr_handle_arprequest(struct sr_instance *sr, struct sr_arpreq *request) {
          * a destination host unreachable should go back to all the sender of
          * packets that were waiting on a reply to this ARP request.  */
         if (request->times_sent >= 5) {
-            struct sr_packet *packet;
-            for (packet=request->packets; packet != NULL; packet=packet->next) {
+            struct sr_packet *packet = request->packets;
+            while (packet != NULL) {
                 sr_send_icmp(sr, packet);
+                packet = packet->next;
             }
             sr_arpreq_destroy(&(sr->cache), request);
         } else {
             sr_send_arpreq(sr, request);
-            request->sent = time(NULL);
+            request->sent = now;
             request->times_sent++;
         }
     }
@@ -313,4 +321,3 @@ void *sr_arpcache_timeout(void *sr_ptr) {
     
     return NULL;
 }
-
