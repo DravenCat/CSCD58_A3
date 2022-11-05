@@ -33,7 +33,7 @@ void sr_send_arpreq(struct sr_instance *sr, struct sr_arpreq *request)
 
 Firstly, perform Sanity check
 ```c
-int pass_sanity_check(uint8_t *packet, unsigned int len)
+int pass_sanity_check(uint8_t *packet, unsigned int len, uint16_t ether_type)
 ```
 
 Then, based on ethertype, call each handling function
