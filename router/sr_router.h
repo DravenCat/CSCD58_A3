@@ -68,7 +68,7 @@ int sr_read_from_server(struct sr_instance* );
 void sr_init(struct sr_instance* );
 void sr_handlepacket(struct sr_instance* , uint8_t * , unsigned int , char* );
 
-int pass_sanity_check(uint8_t *packet, unsigned int len);
+int pass_sanity_check(uint8_t *packet, unsigned int len, uint16_t ether_type);
 void sr_handle_ip_packet(struct sr_instance *sr,
                          uint8_t *packet/* lent */,
                          unsigned int len,
